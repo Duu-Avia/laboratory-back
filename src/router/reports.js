@@ -1,13 +1,11 @@
-import {Router} from "express";
-import { getReport } from "../controller/get-report.js";
-import { createReport } from "../controller/create-report.js";
-import { getReports } from "../controller/get-reports.js";
+import { Router } from "express";
+import { createReportWithSamples, getReportDetail, listReports, saveReportResultsBulk } from "../controller/reports.js";
 
 const reportsRouter = Router();
 
-reportsRouter.get("/list", getReports);
-reportsRouter.post("/create", createReport);
-reportsRouter.get("/list", getReports);
-reportsRouter.get("/:reportId", getReport);
+reportsRouter.post("/create", createReportWithSamples);
+reportsRouter.get("/", listReports);
+reportsRouter.get("/:id", getReportDetail);
+reportsRouter.put("/:id/results", saveReportResultsBulk);
 
 export default reportsRouter;

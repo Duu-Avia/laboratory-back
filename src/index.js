@@ -1,9 +1,9 @@
 import express from "express";
-import dotenv from "dotenv";
 import { getConnection } from "./config/connection-db.js";
-import sampleRouter from "./router/sample.js";
-import reportsRouter from "./router/reports.js";
+import sampleRouter from "./router/indicators.js";
 import cors from "cors";
+import reportsRouter from "./router/reports.js";
+import sampleTypeRouter from "./router/sample-types.js";
 const app = express();
 
 
@@ -13,8 +13,6 @@ const corsOptions = {
 };
 app.use(cors(corsOptions))
 
-dotenv.config();
-
 
 const PORT = process.env.PORT || 8000;
 
@@ -22,8 +20,9 @@ const PORT = process.env.PORT || 8000;
 app.use(express.json());
 
 // Routes
-app.use("/api/sample", sampleRouter);
-app.use("/api/report", reportsRouter);
+app.use("/sample", sampleRouter);
+app.use("/reports", reportsRouter);
+app.use("/sample-types", sampleTypeRouter)
 
 app.get("/", (req, res) => {
   res.send("Laboratory API is running");

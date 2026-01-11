@@ -55,12 +55,11 @@ async function initDatabase() {
     `);
     console.log("✅ reports table created");
 
-    // 4. Samples (with report_id)
+    // 4. Samples 
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='samples' AND xtype='U')
       CREATE TABLE samples (
         id INT IDENTITY(1,1) PRIMARY KEY,
-        report_id INT NULL FOREIGN KEY REFERENCES reports(id) ON DELETE SET NULL,
         sample_type_id INT FOREIGN KEY REFERENCES sample_types(id),
         sample_name NVARCHAR(300) NOT NULL,
         sample_amount VARCHAR(50),
@@ -108,18 +107,6 @@ async function initDatabase() {
     `);
     console.log("✅ test_results table created");
 
-    // 7. Packed Locations (optional)
-    await pool.request().query(`
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='packed_locations' AND xtype='U')
-      CREATE TABLE packed_locations(
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        location_name NVARCHAR(200) NOT NULL,
-        description NVARCHAR(500),
-        created_at DATETIME DEFAULT GETDATE(),
-        updated_at DATETIME DEFAULT GETDATE()
-      )
-    `);
-    console.log("✅ packed_locations table created");
 
   } catch (error) {
     console.log("❌ Failed while creating tables", error);
