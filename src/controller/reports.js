@@ -14,7 +14,7 @@ export async function createReportWithSamples(req, res) {
 
   try {
     pool = await getConnection();
-    tx.connection = pool; // for mssql Transaction usage
+    tx.connection = pool;
     await tx.begin(sql.ISOLATION_LEVEL.READ_COMMITTED);
 
     // 1) create report
@@ -62,8 +62,7 @@ export async function createReportWithSamples(req, res) {
 
       const sampleId = sampleInsert.recordset[0].id;
 
-      // Insert sample_indicators (bulk-ish)
-      // Make sure you add UNIQUE(sample_id, indicator_id) in DB to prevent duplicates.
+      // Insert sample_indicators
       for (const indicatorId of s.indicators) {
         const siReq = new sql.Request(tx);
         await siReq
@@ -79,6 +78,16 @@ export async function createReportWithSamples(req, res) {
       createdSamples.push({ sample_id: sampleId, sample_name: s.sample_name });
     }
 
+    // ✅ Update report status ONCE (no @reportId bug)
+    await new sql.Request(tx)
+      .input("reportId", sql.Int, reportId)
+      .query(`
+        UPDATE reports
+        SET status = 'pending_samples',
+            updated_at = GETDATE()
+        WHERE id = @reportId
+      `);
+
     await tx.commit();
 
     return res.status(201).json({
@@ -91,6 +100,7 @@ export async function createReportWithSamples(req, res) {
     return res.status(500).json({ message: "Failed to create report", error: String(err.message ?? err) });
   }
 }
+
 
 // GET /reports?from=YYYY-MM-DD&to=YYYY-MM-DD&status=draft
 export async function listReports(req, res) {
@@ -112,7 +122,12 @@ export async function listReports(req, res) {
           r.status,
           r.created_at,
           COUNT(DISTINCT s.id) AS sample_count,
-          STRING_AGG(s.sample_name, ', ') AS sample_names
+          STUFF((
+            SELECT ', ' + s2.sample_name
+            FROM samples s2
+            WHERE s2.report_id = r.id
+            FOR XML PATH(''), TYPE
+          ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS sample_names
         FROM reports r
         LEFT JOIN samples s ON s.report_id = r.id
         WHERE
@@ -213,17 +228,16 @@ export async function saveReportResultsBulk(req, res) {
     tx.connection = pool;
     await tx.begin(sql.ISOLATION_LEVEL.READ_COMMITTED);
 
-    // Optional safety: ensure these sample_indicator_ids belong to this report
-    // (prevents saving into other report by mistake)
-    const ids = results.map(r => Number(r.sample_indicator_id)).filter(Boolean);
+    // Validate ids
+    const ids = results.map((r) => Number(r.sample_indicator_id)).filter(Boolean);
     if (ids.length !== results.length) throw new Error("Invalid sample_indicator_id in results");
 
-    // For simplicity, upsert per row (good enough for MVP)
     for (const item of results) {
       const reqTx = new sql.Request(tx);
+
       await reqTx
         .input("reportId", sql.Int, reportId)
-        .input("sample_indicator_id", sql.Int, item.sample_indicator_id)
+        .input("sample_indicator_id", sql.Int, Number(item.sample_indicator_id))
         .input("result_value", sql.VarChar(100), item.result_value ?? null)
         .input("is_detected", sql.Bit, item.is_detected ?? null)
         .input("is_within_limit", sql.Bit, item.is_within_limit ?? null)
@@ -238,10 +252,14 @@ export async function saveReportResultsBulk(req, res) {
             JOIN samples s ON s.id = si.sample_id
             WHERE si.id = @sample_indicator_id AND s.report_id = @reportId
           )
-          THROW 50001, 'sample_indicator_id does not belong to this report', 1;
+          BEGIN
+            RAISERROR('sample_indicator_id does not belong to this report', 16, 1);
+            RETURN;
+          END
 
-          -- Upsert result: 1 row per sample_indicator_id (recommended)
+          -- Upsert result
           IF EXISTS (SELECT 1 FROM test_results WHERE sample_indicator_id = @sample_indicator_id)
+          BEGIN
             UPDATE test_results
               SET result_value = @result_value,
                   is_detected = @is_detected,
@@ -251,19 +269,56 @@ export async function saveReportResultsBulk(req, res) {
                   measured_at = @measured_at,
                   updated_at = GETDATE()
             WHERE sample_indicator_id = @sample_indicator_id;
+          END
           ELSE
-            INSERT INTO test_results (sample_indicator_id, result_value, is_detected, is_within_limit, equipment_id, notes, measured_at)
-            VALUES (@sample_indicator_id, @result_value, @is_detected, @is_within_limit, @equipment_id, @notes, @measured_at);
+          BEGIN
+            INSERT INTO test_results
+              (sample_indicator_id, result_value, is_detected, is_within_limit, equipment_id, notes, measured_at, created_at, updated_at)
+            VALUES
+              (@sample_indicator_id, @result_value, @is_detected, @is_within_limit, @equipment_id, @notes, @measured_at, GETDATE(), GETDATE());
+          END
         `);
     }
+    // AFTER saving all test_results, update report status (better rule)
+  await new sql.Request(tx)
+  .input("reportId", sql.Int, reportId)
+  .query(`
+    -- If any indicator under this report has NO result yet → still pending
+    IF EXISTS (
+      SELECT 1
+      FROM sample_indicators si
+      JOIN samples s ON s.id = si.sample_id
+      LEFT JOIN test_results tr ON tr.sample_indicator_id = si.id
+      WHERE s.report_id = @reportId
+        AND tr.id IS NULL
+    )
+    BEGIN
+      UPDATE reports
+        SET status = 'pending_samples',
+            updated_at = GETDATE()
+      WHERE id = @reportId;
+    END
+    ELSE
+    BEGIN
+      UPDATE reports
+        SET status = 'tested',
+            updated_at = GETDATE()
+      WHERE id = @reportId;
+    END
+  `);
 
-    // Optionally update report status
-    // UPDATE reports SET status='completed' WHERE id=@reportId
 
     await tx.commit();
-    res.json({ message: "Results saved", count: results.length });
+    return res.json({ code: 201, message: "success" });
   } catch (err) {
-    try { await tx.rollback(); } catch {}
-    res.status(500).json({ message: "Failed to save results", error: String(err.message ?? err) });
+    try {
+      if (tx._aborted !== true) await tx.rollback(); // safe-ish; or just try/catch rollback
+    } catch {}
+
+    return res.status(500).json({
+      message: "Failed to save results",
+      error: String(err?.message ?? err),
+    });
   }
 }
+

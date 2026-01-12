@@ -61,6 +61,7 @@ async function initDatabase() {
       CREATE TABLE samples (
         id INT IDENTITY(1,1) PRIMARY KEY,
         sample_type_id INT FOREIGN KEY REFERENCES sample_types(id),
+        report_id INT FOREIGN KEY REFERENCES reports(id),
         sample_name NVARCHAR(300) NOT NULL,
         sample_amount VARCHAR(50),
         location NVARCHAR(200),

@@ -10,5 +10,4 @@ export async function getSampleTypes (req, res){
         console.log('error while getting sample_type', err)
         res.status(500).json({error:"Failed to get sample_type"})
     }
-    console.log("orj irj bn shvv!!!")
 }

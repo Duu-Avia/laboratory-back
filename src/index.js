@@ -24,6 +24,7 @@ app.use("/sample", sampleRouter);
 app.use("/reports", reportsRouter);
 app.use("/sample-types", sampleTypeRouter)
 
+
 app.get("/", (req, res) => {
   res.send("Laboratory API is running");
 });
