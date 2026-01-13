@@ -127,7 +127,13 @@ export async function listReports(req, res) {
             FROM samples s2
             WHERE s2.report_id = r.id
             FOR XML PATH(''), TYPE
-          ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS sample_names
+          ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS sample_names,
+          (
+            SELECT TOP 1 st.type_name
+            FROM samples s3
+            JOIN sample_types st ON st.id = s3.sample_type_id
+            WHERE s3.report_id = r.id
+          ) AS sample_type
         FROM reports r
         LEFT JOIN samples s ON s.report_id = r.id
         WHERE
@@ -135,9 +141,8 @@ export async function listReports(req, res) {
           AND (@from IS NULL OR r.test_start_date >= @from)
           AND (@to IS NULL OR r.test_end_date <= @to)
         GROUP BY r.id, r.report_title, r.test_start_date, r.test_end_date, r.analyst, r.status, r.created_at
-        ORDER BY r.created_at ASC
+        ORDER BY r.created_at DESC
       `);
-
     res.json(r.recordset);
   } catch (err) {
     res.status(500).json({ message: "Failed to list reports", error: String(err.message ?? err) });
