@@ -70,7 +70,7 @@ export async function createReportWithSamples(req, res) {
           .input("indicator_id", sql.Int, indicatorId)
           .input("analyst", sql.NVarChar(100), analyst ?? null)
           .query(`
-            INSERT INTO sample_indicators (sample_id, indicator_id, analyst, status)
+            INSERT INTO sample_indicators (sample_id, indicator_id, analyst)
             VALUES (@sample_id, @indicator_id, @analyst, 'pending')
           `);
       }
@@ -326,4 +326,111 @@ export async function saveReportResultsBulk(req, res) {
     });
   }
 }
+// delete heseg shvv
+export async function sofDeleteReport(req, res) {
+  const reportId = req.params.id
+  if(!reportId) return res.status(400).json({message:"reportId for deletion invalid"});
+  try{
+    const pool = getConnection();
 
+    const checkStatus = await pool.request()
+    .input("reportId", sql.Int, reportId)
+    .query(`SELECT status FROM reports WHERE id = @reportId`)
+    
+    if (checkStatus.length === 0){
+      return res.status(400).json({message:'Report not found'})
+    }
+    
+    await pool.request()
+    .input("reportId", sql.Int, reportId)
+    .query(`
+      UPDATE reports
+      SET status = 'deleted',
+       updated_date = GETDATE()
+      WHERE id = @reportId`);
+
+    return res.json({message:'report deleted successfully'})
+
+  }catch(err){
+    res.status(500).json({message:"error while deleting report"})
+  }
+}
+
+export async function updateReport(req,res){
+  const reportId =  req.params.id;
+  const {report_title, samples} = req.body;
+  if(!reportId) return res.status(400).json({message:'reportId for edit invalid'})
+
+    const pool = await getConnection();
+    const tx = new sql.Transaction(pool)
+    try{
+      const checkStatus = await pool.request()
+      .input("reportId", sql.Int, reportId)
+      .query(`SELECT status FROM reports WHERE id = @reportId`)
+
+      if(checkStatus.length === 0 ) return res.status(400).json({message:"report not found"})
+      if(checkStatus === 'approved') return res.status(400).json({message:"report already approved"})
+      
+      await tx.begin(sql.ISOLATION_LEVEL.READ_COMMITTED);
+
+      if(report_title){
+        await new sql.Request(tx)
+        .input("reportId", sql.Int, reportId)
+        .input("report_title", sql.NVarChar(200), report_title)
+        .query(`UPDATE reports
+          SET report_title = @report_title,
+            updated_date = GETDATE(),
+          WHERE id = @reportId
+          `);
+      }
+
+      if(Array.isArray(samples) && samples.length > 0 ){
+        await new sql.Request(tx)
+        .input("reportId", sql.Int, reportId)
+        .query(`
+          DELETE FROM samples WHERE report_id = @reportId
+          `);
+        
+        for(const s of samples){
+          if(!s.sample_type_id || !samples.sample_name) {
+            throw new Error ("Each sample must include sample name and sample type")
+          }
+
+          if(!Array.isArray(s.indicators) || s.indicators.length ==- 0){
+            throw new Error("must include indicators")
+          }
+
+          const sampleInsert = await new sql.Request(tx)
+          .input("reportId", sql.Int, reportId)
+          .input("sample_type_id", sql.Int, s.sample_type_id)
+          .input("sample_name", sql.NVarChar(200), s.sample_name)
+          .input("sample_date", sql.Date, s.sample_date)
+          .input("sampled_by", sql.NVarChar(100), s.sampled_by)
+          .input("location", sql.NVarChar(200), s.location)
+          .query(`
+            INSERT INTO samples(report_id, sample_type_id, sample_name, sample_date, location, sampled_by, status)
+            .OUTPUT INSERTED.id
+            VALUES(@report_id, @sample_type_id, @sample_name, @location, @sampled_by, @status, 'edited_and_pending')
+            `);
+          const sampleId = sampleInsert.recordset[0].id;
+
+          for(const indicatorId of s.indicators){
+            await new sql.Request(tx)
+            .input("sampleId", sql.Int, sampleId)
+            .input("indicatorId", sql.Int, indicatorId)
+            .query(`
+              INSERT INTO sample_indicators (sample_id, indicator_id) VALUES(@sample_id, @indicator_id)
+              `)
+          }
+        }
+      }
+
+      await tx.commit();
+      return res.json({message:"Report updated successfully"})
+
+    }catch(err){
+      try{await tx.rollback();}catch{}
+      return res.status(500).json({message: "Failed to update report", error: String(err.message ?? err)})
+    }
+  
+}
