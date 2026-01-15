@@ -3,7 +3,7 @@ import { getConnection } from "../config/connection-db.js"; // adjust path if ne
 
 
 export async function createReportWithSamples(req, res) {
-  const { report_title, test_start_date, test_end_date, approved_by, analyst, samples } = req.body;
+  const { report_title, test_start_date, test_end_date, approved_by, analyst, samples, status } = req.body;
 
   if (!Array.isArray(samples) || samples.length === 0) {
     return res.status(400).json({ message: "samples is required and must be a non-empty array" });
@@ -55,9 +55,9 @@ export async function createReportWithSamples(req, res) {
         .input("sample_date", sql.Date, s.sample_date ?? null)
         .input("sampled_by", sql.NVarChar(100), s.sampled_by ?? null)
         .query(`
-          INSERT INTO samples (report_id, sample_type_id, sample_name, sample_amount, location, sample_date, sampled_by, status)
+          INSERT INTO samples (report_id, sample_type_id, sample_name, sample_amount, location, sample_date, sampled_by)
           OUTPUT INSERTED.id
-          VALUES (@report_id, @sample_type_id, @sample_name, @sample_amount, @location, @sample_date, @sampled_by, 'pending')
+          VALUES (@report_id, @sample_type_id, @sample_name, @sample_amount, @location, @sample_date, @sampled_by)
         `);
 
       const sampleId = sampleInsert.recordset[0].id;
@@ -71,7 +71,7 @@ export async function createReportWithSamples(req, res) {
           .input("analyst", sql.NVarChar(100), analyst ?? null)
           .query(`
             INSERT INTO sample_indicators (sample_id, indicator_id, analyst)
-            VALUES (@sample_id, @indicator_id, @analyst, 'pending')
+            VALUES (@sample_id, @indicator_id, @analyst)
           `);
       }
 
@@ -331,7 +331,7 @@ export async function sofDeleteReport(req, res) {
   const reportId = req.params.id
   if(!reportId) return res.status(400).json({message:"reportId for deletion invalid"});
   try{
-    const pool = getConnection();
+    const pool = await getConnection();
 
     const checkStatus = await pool.request()
     .input("reportId", sql.Int, reportId)
@@ -345,14 +345,17 @@ export async function sofDeleteReport(req, res) {
     .input("reportId", sql.Int, reportId)
     .query(`
       UPDATE reports
-      SET status = 'deleted',
-       updated_date = GETDATE()
+      SET status = 'deleted'
       WHERE id = @reportId`);
 
     return res.json({message:'report deleted successfully'})
 
-  }catch(err){
-    res.status(500).json({message:"error while deleting report"})
+  }catch (err) {
+    console.error("Delete error:", err); // ADD THIS LINE
+    return res.status(500).json({ 
+      message: "Failed to delete report", 
+      error: String(err.message ?? err) // ADD ERROR DETAILS
+    });
   }
 }
 
