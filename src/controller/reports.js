@@ -125,17 +125,17 @@ export async function listReports(req, res) {
           STUFF((
             SELECT ', ' + s2.sample_name
             FROM samples s2
-            WHERE s2.report_id = r.id
+            WHERE s2.report_id = r.id AND s2.status != 'deleted'
             FOR XML PATH(''), TYPE
           ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS sample_names,
           (
             SELECT TOP 1 st.type_name
             FROM samples s3
             JOIN sample_types st ON st.id = s3.sample_type_id
-            WHERE s3.report_id = r.id
+            WHERE s3.report_id = r.id AND s3.status != 'deleted'
           ) AS sample_type
         FROM reports r
-        LEFT JOIN samples s ON s.report_id = r.id
+        LEFT JOIN samples s ON s.report_id = r.id AND s.status != 'deleted'
         WHERE
           (@status IS NULL OR r.status = @status)
           AND (@from IS NULL OR r.test_start_date >= @from)
@@ -149,7 +149,8 @@ export async function listReports(req, res) {
   }
 }
 
-// GET /reports/:id  (flat rows; frontend groups by sample)
+
+// GET /reports/:id  
 export async function getReportDetail(req, res) {
   const reportId = Number(req.params.id);
   if (!reportId) return res.status(400).json({ message: "Invalid report id" });
@@ -166,7 +167,7 @@ export async function getReportDetail(req, res) {
           r.test_end_date,
           r.approved_by,
           r.analyst,
-          r.status,
+          r.status AS report_status,
 
           s.id AS sample_id,
           s.sample_type_id,
@@ -194,28 +195,89 @@ export async function getReportDetail(req, res) {
           tr.notes,
           tr.measured_at
         FROM reports r
-        JOIN samples s ON s.report_id = r.id
-        JOIN sample_indicators si ON si.sample_id = s.id
+        JOIN samples s ON s.report_id = r.id AND s.status != 'deleted'
+        JOIN sample_indicators si ON si.sample_id = s.id AND si.status != 'deleted'
         JOIN indicators i ON i.id = si.indicator_id
         LEFT JOIN test_results tr ON tr.sample_indicator_id = si.id
         WHERE r.id = @reportId
         ORDER BY s.id, i.id
       `);
 
-    res.json({ report_id: reportId, rows: r.recordset });
+    const rows = r.recordset;
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ message: "Report not found" });
+    }
+
+    // Report (same in every row)
+    const first = rows[0];
+    const report = {
+      id: first.report_id,
+      report_title: first.report_title,
+      test_start_date: first.test_start_date,
+      test_end_date: first.test_end_date,
+      approved_by: first.approved_by,
+      analyst: first.analyst,
+      status: first.report_status,
+    };
+
+    // Group into samples -> indicators
+    const sampleMap = new Map();
+
+    for (const row of rows) {
+      if (!sampleMap.has(row.sample_id)) {
+        sampleMap.set(row.sample_id, {
+          sample_id: row.sample_id,
+          sample_type_id: row.sample_type_id,
+          sample_name: row.sample_name,
+          sample_amount: row.sample_amount,
+          location: row.location,
+          sample_date: row.sample_date,
+          sampled_by: row.sampled_by,
+          status: row.sample_status,
+          indicators: [],
+        });
+      }
+
+      const sample = sampleMap.get(row.sample_id);
+
+      sample.indicators.push({
+        sample_indicator_id: row.sample_indicator_id,
+        sample_indicator_status: row.sample_indicator_status,
+        indicator_id: row.indicator_id,
+        indicator_name: row.indicator_name,
+        unit: row.unit,
+        test_method: row.test_method,
+        limit_value: row.limit_value,
+        result: row.test_result_id
+          ? {
+              test_result_id: row.test_result_id,
+              result_value: row.result_value,
+              is_detected: row.is_detected,
+              is_within_limit: row.is_within_limit,
+              equipment_id: row.equipment_id,
+              notes: row.notes,
+              measured_at: row.measured_at,
+            }
+          : null,
+      });
+    }
+
+    return res.json({
+      report,
+      samples: Array.from(sampleMap.values()),
+    });
   } catch (err) {
-    res.status(500).json({ message: "Failed to get report detail", error: String(err.message ?? err) });
+    res.status(500).json({
+      message: "Failed to get report detail",
+      error: String(err.message ?? err),
+    });
   }
 }
 
-// PUT /reports/:id/results
-// Body example:
-// {
-//   "results": [
-//     { "sample_indicator_id": 10, "result_value": "7.1", "is_detected": true, "is_within_limit": true, "notes": "", "measured_at": "2026-01-10T12:00:00" },
-//     { "sample_indicator_id": 11, "result_value": "0.02", "is_detected": true, "is_within_limit": false }
-//   ]
-// }
+
+
+
 export async function saveReportResultsBulk(req, res) {
   const reportId = Number(req.params.id);
   const { results } = req.body;
@@ -359,81 +421,238 @@ export async function sofDeleteReport(req, res) {
   }
 }
 
-export async function updateReport(req,res){
-  const reportId =  req.params.id;
-  const {report_title, samples} = req.body;
-  if(!reportId) return res.status(400).json({message:'reportId for edit invalid'})
+export async function updateReport(req, res) {
+  const reportId = Number(req.params.id);
+  const { report_title, samples } = req.body;
 
-    const pool = await getConnection();
-    const tx = new sql.Transaction(pool)
-    try{
-      const checkStatus = await pool.request()
+  console.log("=== UPDATE REPORT ===");
+  console.log("reportId:", reportId);
+  console.log("samples received:", samples.map(s => ({ sample_id: s.sample_id, sample_name: s.sample_name, indicators: s.indicators?.length })));
+
+  if (!reportId) return res.status(400).json({ message: "Invalid reportId" });
+  if (!Array.isArray(samples)) return res.status(400).json({ message: "samples must be array" });
+
+  const pool = await getConnection();
+  const tx = new sql.Transaction(pool);
+
+  try {
+    // Check report exists and not approved
+    const check = await pool.request()
       .input("reportId", sql.Int, reportId)
-      .query(`SELECT status FROM reports WHERE id = @reportId`)
+      .query(`SELECT status FROM reports WHERE id = @reportId`);
 
-      if(checkStatus.length === 0 ) return res.status(400).json({message:"report not found"})
-      if(checkStatus === 'approved') return res.status(400).json({message:"report already approved"})
-      
-      await tx.begin(sql.ISOLATION_LEVEL.READ_COMMITTED);
+    const currentStatus = check.recordset?.[0]?.status;
+    if (!currentStatus) return res.status(404).json({ message: "Report not found" });
+    if (currentStatus === "approved") return res.status(400).json({ message: "Cannot edit approved report" });
 
-      if(report_title){
-        await new sql.Request(tx)
+    await tx.begin(sql.ISOLATION_LEVEL.READ_COMMITTED);
+
+    // 1) Update report title
+    if (typeof report_title === "string") {
+      await new sql.Request(tx)
         .input("reportId", sql.Int, reportId)
-        .input("report_title", sql.NVarChar(200), report_title)
-        .query(`UPDATE reports
-          SET report_title = @report_title,
-            updated_date = GETDATE(),
-          WHERE id = @reportId
-          `);
+        .input("title", sql.NVarChar(200), report_title)
+        .query(`UPDATE reports SET report_title = @title WHERE id = @reportId`);
+    }
+
+    // 2) Soft-delete samples that were removed from the list
+    const existingSamples = await new sql.Request(tx)
+      .input("reportId", sql.Int, reportId)
+      .query(`SELECT id FROM samples WHERE report_id = @reportId AND status != 'deleted'`);
+
+    const existingIds = existingSamples.recordset.map((r) => Number(r.id));
+    const incomingIds = samples.map((s) => s.sample_id).filter((id) => id != null).map(id => Number(id));
+    
+    console.log("existingIds in DB:", existingIds);
+    console.log("incomingIds from frontend:", incomingIds);
+    
+    const idsToDelete = existingIds.filter((id) => !incomingIds.includes(id));
+    
+    console.log("sample idsToDelete:", idsToDelete);
+
+    for (const id of idsToDelete) {
+      console.log("Soft-deleting sample id:", id);
+      await new sql.Request(tx)
+        .input("sampleId", sql.Int, id)
+        .query(`UPDATE samples SET status = 'deleted' WHERE id = @sampleId`);
+    }
+
+    // 3) Process each sample (update existing or insert new)
+    for (const s of samples) {
+      if (!s.sample_type_id || !s.sample_name) {
+        throw new Error("Each sample must have sample_type_id and sample_name");
       }
 
-      if(Array.isArray(samples) && samples.length > 0 ){
-        await new sql.Request(tx)
-        .input("reportId", sql.Int, reportId)
-        .query(`
-          DELETE FROM samples WHERE report_id = @reportId
-          `);
-        
-        for(const s of samples){
-          if(!s.sample_type_id || !samples.sample_name) {
-            throw new Error ("Each sample must include sample name and sample type")
-          }
+      let sampleId = s.sample_id;
 
-          if(!Array.isArray(s.indicators) || s.indicators.length ==- 0){
-            throw new Error("must include indicators")
-          }
-
-          const sampleInsert = await new sql.Request(tx)
+      // INSERT new sample if no sample_id
+      if (!sampleId) {
+        const inserted = await new sql.Request(tx)
           .input("reportId", sql.Int, reportId)
           .input("sample_type_id", sql.Int, s.sample_type_id)
           .input("sample_name", sql.NVarChar(200), s.sample_name)
-          .input("sample_date", sql.Date, s.sample_date)
-          .input("sampled_by", sql.NVarChar(100), s.sampled_by)
-          .input("location", sql.NVarChar(200), s.location)
+          .input("sample_date", sql.Date, s.sample_date || null)
+          .input("location", sql.NVarChar(200), s.location ?? "")
+          .input("sampled_by", sql.NVarChar(100), s.sampled_by ?? "")
           .query(`
             INSERT INTO samples(report_id, sample_type_id, sample_name, sample_date, location, sampled_by, status)
-            .OUTPUT INSERTED.id
-            VALUES(@report_id, @sample_type_id, @sample_name, @location, @sampled_by, @status, 'edited_and_pending')
-            `);
-          const sampleId = sampleInsert.recordset[0].id;
+            OUTPUT INSERTED.id
+            VALUES (@reportId, @sample_type_id, @sample_name, @sample_date, @location, @sampled_by, 'pending')
+          `);
+        sampleId = inserted.recordset[0].id;
+        console.log("Inserted new sample with id:", sampleId);
+      } else {
+        // UPDATE existing sample
+        console.log("Updating sample id:", sampleId);
+        await new sql.Request(tx)
+          .input("reportId", sql.Int, reportId)
+          .input("sampleId", sql.Int, sampleId)
+          .input("sample_type_id", sql.Int, s.sample_type_id)
+          .input("sample_name", sql.NVarChar(200), s.sample_name)
+          .input("sample_date", sql.Date, s.sample_date || null)
+          .input("location", sql.NVarChar(200), s.location ?? "")
+          .input("sampled_by", sql.NVarChar(100), s.sampled_by ?? "")
+          .query(`
+            UPDATE samples
+            SET sample_type_id = @sample_type_id,
+                sample_name = @sample_name,
+                sample_date = @sample_date,
+                location = @location,
+                sampled_by = @sampled_by,
+                status = 'edited_and_pending'
+            WHERE id = @sampleId AND report_id = @reportId
+          `);
+      }
 
-          for(const indicatorId of s.indicators){
-            await new sql.Request(tx)
+      // 4) Soft-delete indicators that were removed
+      const incomingIndicatorIds = (s.indicators ?? [])
+        .map(ind => typeof ind === "number" ? ind : ind?.indicator_id)
+        .filter(id => id != null)
+        .map(id => Number(id));
+
+      const existingIndicators = await new sql.Request(tx)
+        .input("sampleId", sql.Int, sampleId)
+        .query(`
+          SELECT id, indicator_id 
+          FROM sample_indicators 
+          WHERE sample_id = @sampleId AND status != 'deleted'
+        `);
+
+      const existingIndicatorIds = existingIndicators.recordset.map(r => Number(r.indicator_id));
+      const indicatorIdsToDelete = existingIndicatorIds.filter(id => !incomingIndicatorIds.includes(id));
+
+      console.log(`Sample ${sampleId} - existing indicators:`, existingIndicatorIds);
+      console.log(`Sample ${sampleId} - incoming indicators:`, incomingIndicatorIds);
+      console.log(`Sample ${sampleId} - indicators to delete:`, indicatorIdsToDelete);
+
+      for (const indicatorId of indicatorIdsToDelete) {
+        await new sql.Request(tx)
+          .input("sampleId", sql.Int, sampleId)
+          .input("indicatorId", sql.Int, indicatorId)
+          .query(`
+            UPDATE sample_indicators 
+            SET status = 'deleted' 
+            WHERE sample_id = @sampleId AND indicator_id = @indicatorId
+          `);
+        console.log(`Soft-deleted indicator ${indicatorId} for sample ${sampleId}`);
+      }
+
+      // 5) Process indicators for this sample (add new ones)
+      if (!Array.isArray(s.indicators)) continue;
+
+      for (const ind of s.indicators) {
+        const indicatorId = typeof ind === "number" ? ind : ind?.indicator_id;
+        if (!indicatorId) continue;
+
+        let sampleIndicatorId = ind?.sample_indicator_id ?? null;
+
+        if (!sampleIndicatorId) {
+          const existing = await new sql.Request(tx)
             .input("sampleId", sql.Int, sampleId)
             .input("indicatorId", sql.Int, indicatorId)
             .query(`
-              INSERT INTO sample_indicators (sample_id, indicator_id) VALUES(@sample_id, @indicator_id)
-              `)
+              SELECT TOP 1 id, status FROM sample_indicators
+              WHERE sample_id = @sampleId AND indicator_id = @indicatorId
+            `);
+          
+          if (existing.recordset?.[0]) {
+            sampleIndicatorId = existing.recordset[0].id;
+            // If it was deleted, restore it
+            if (existing.recordset[0].status === 'deleted') {
+              await new sql.Request(tx)
+                .input("id", sql.Int, sampleIndicatorId)
+                .query(`UPDATE sample_indicators SET status = 'pending' WHERE id = @id`);
+              console.log(`Restored indicator ${indicatorId} for sample ${sampleId}`);
+            }
+          }
+        }
+
+        if (!sampleIndicatorId) {
+          const inserted = await new sql.Request(tx)
+            .input("sampleId", sql.Int, sampleId)
+            .input("indicatorId", sql.Int, indicatorId)
+            .query(`
+              INSERT INTO sample_indicators(sample_id, indicator_id, status)
+              OUTPUT INSERTED.id
+              VALUES (@sampleId, @indicatorId, 'pending')
+            `);
+          sampleIndicatorId = inserted.recordset[0].id;
+          console.log(`Inserted new indicator ${indicatorId} for sample ${sampleId}`);
+        }
+
+        // 6) Process test result if provided
+        const r = ind.result;
+        if (!r) continue;
+
+        if (r.test_result_id) {
+          await new sql.Request(tx)
+            .input("testResultId", sql.Int, r.test_result_id)
+            .input("sampleIndicatorId", sql.Int, sampleIndicatorId)
+            .input("result_value", sql.NVarChar(200), r.result_value ?? null)
+            .input("is_detected", sql.Bit, r.is_detected ?? null)
+            .input("is_within_limit", sql.Bit, r.is_within_limit ?? null)
+            .input("equipment_id", sql.Int, r.equipment_id ?? null)
+            .input("notes", sql.NVarChar(sql.MAX), r.notes ?? null)
+            .query(`
+              UPDATE test_results
+              SET result_value = @result_value,
+                  is_detected = @is_detected,
+                  is_within_limit = @is_within_limit,
+                  equipment_id = @equipment_id,
+                  notes = @notes,
+                  measured_at = COALESCE(measured_at, GETDATE())
+              WHERE id = @testResultId AND sample_indicator_id = @sampleIndicatorId
+            `);
+        } else {
+          const existsRes = await new sql.Request(tx)
+            .input("sampleIndicatorId", sql.Int, sampleIndicatorId)
+            .query(`SELECT TOP 1 id FROM test_results WHERE sample_indicator_id = @sampleIndicatorId`);
+
+          if (!existsRes.recordset?.[0]?.id) {
+            await new sql.Request(tx)
+              .input("sampleIndicatorId", sql.Int, sampleIndicatorId)
+              .input("result_value", sql.NVarChar(200), r.result_value ?? null)
+              .input("is_detected", sql.Bit, r.is_detected ?? null)
+              .input("is_within_limit", sql.Bit, r.is_within_limit ?? null)
+              .input("equipment_id", sql.Int, r.equipment_id ?? null)
+              .input("notes", sql.NVarChar(sql.MAX), r.notes ?? null)
+              .query(`
+                INSERT INTO test_results(sample_indicator_id, result_value, is_detected, is_within_limit, equipment_id, notes, measured_at)
+                VALUES (@sampleIndicatorId, @result_value, @is_detected, @is_within_limit, @equipment_id, @notes, GETDATE())
+              `);
           }
         }
       }
-
-      await tx.commit();
-      return res.json({message:"Report updated successfully"})
-
-    }catch(err){
-      try{await tx.rollback();}catch{}
-      return res.status(500).json({message: "Failed to update report", error: String(err.message ?? err)})
     }
-  
+
+    await tx.commit();
+    console.log("=== UPDATE COMPLETE ===");
+    return res.json({ message: "Report updated successfully" });
+  } catch (err) {
+    console.error("Update error:", err);
+    try { await tx.rollback(); } catch {}
+    return res.status(500).json({ message: "Failed to update report", error: String(err.message ?? err) });
+  }
 }
+
+
