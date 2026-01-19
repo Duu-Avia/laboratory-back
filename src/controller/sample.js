@@ -12,7 +12,6 @@ export async function getIndicatorsBySampleType(req, res) {
     const pool = await getConnection();
 
     if (defaultOnly) {
-      // If you're still using indicators.is_default:
       const r = await pool.request()
         .input("sampleTypeId", sql.Int, sampleTypeId)
         .query(`

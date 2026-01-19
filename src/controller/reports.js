@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { getConnection } from "../config/connection-db.js"; // adjust path if needed
+import { getConnection } from "../config/connection-db.js"; 
 
 
 export async function createReportWithSamples(req, res) {
@@ -17,7 +17,7 @@ export async function createReportWithSamples(req, res) {
     tx.connection = pool;
     await tx.begin(sql.ISOLATION_LEVEL.READ_COMMITTED);
 
-    // 1) create report
+    //  create report
     const reportReq = new sql.Request(tx);
     const reportInsert = await reportReq
       .input("report_title", sql.NVarChar(200), report_title ?? null)
@@ -33,7 +33,7 @@ export async function createReportWithSamples(req, res) {
 
     const reportId = reportInsert.recordset[0].id;
 
-    // 2) insert samples + indicators
+    //  insert samples + indicators
     const createdSamples = [];
 
     for (const s of samples) {
@@ -78,7 +78,7 @@ export async function createReportWithSamples(req, res) {
       createdSamples.push({ sample_id: sampleId, sample_name: s.sample_name });
     }
 
-    // ✅ Update report status ONCE (no @reportId bug)
+    // Update report status ONCE 
     await new sql.Request(tx)
       .input("reportId", sql.Int, reportId)
       .query(`
@@ -102,7 +102,7 @@ export async function createReportWithSamples(req, res) {
 }
 
 
-// GET /reports?from=YYYY-MM-DD&to=YYYY-MM-DD&status=draft
+// GET /reports
 export async function listReports(req, res) {
   const { from, to, status } = req.query;
 
@@ -121,29 +121,46 @@ export async function listReports(req, res) {
           r.analyst,
           r.status,
           r.created_at,
-          COUNT(DISTINCT s.id) AS sample_count,
-          STUFF((
-            SELECT ', ' + s2.sample_name
-            FROM samples s2
-            WHERE s2.report_id = r.id AND s2.status != 'deleted'
-            FOR XML PATH(''), TYPE
-          ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS sample_names,
-          (
-            SELECT TOP 1 st.type_name
-            FROM samples s3
-            JOIN sample_types st ON st.id = s3.sample_type_id
-            WHERE s3.report_id = r.id AND s3.status != 'deleted'
-          ) AS sample_type
+          s.id AS sample_id,
+          s.sample_name,
+          st.type_name AS sample_type
         FROM reports r
         LEFT JOIN samples s ON s.report_id = r.id AND s.status != 'deleted'
+        LEFT JOIN sample_types st ON st.id = s.sample_type_id
         WHERE
           (@status IS NULL OR r.status = @status)
           AND (@from IS NULL OR r.test_start_date >= @from)
           AND (@to IS NULL OR r.test_end_date <= @to)
-        GROUP BY r.id, r.report_title, r.test_start_date, r.test_end_date, r.analyst, r.status, r.created_at
-        ORDER BY r.created_at DESC
+        ORDER BY r.created_at DESC, r.id, s.id
       `);
-    res.json(r.recordset);
+
+    const reportsMap = new Map();
+
+    for (const row of r.recordset) {
+      if (!reportsMap.has(row.id)) {
+        reportsMap.set(row.id, {
+          id: row.id,
+          report_title: row.report_title,
+          test_start_date: row.test_start_date,
+          test_end_date: row.test_end_date,
+          analyst: row.analyst,
+          status: row.status,
+          created_at: row.created_at,
+          sample_type: row.sample_type,
+          sample_names: [],
+        });
+      }
+      if (row.sample_name) {
+        reportsMap.get(row.id).sample_names.push(row.sample_name);
+      }
+    }
+    const reports = Array.from(reportsMap.values()).map((report) => ({
+      ...report,
+      sample_count: report.sample_names.length,
+      sample_names: report.sample_names.join(", "),
+    }));
+
+    res.json(reports);
   } catch (err) {
     res.status(500).json({ message: "Failed to list reports", error: String(err.message ?? err) });
   }
@@ -209,7 +226,7 @@ export async function getReportDetail(req, res) {
       return res.status(404).json({ message: "Report not found" });
     }
 
-    // Report (same in every row)
+    // Report 
     const first = rows[0];
     const report = {
       id: first.report_id,
