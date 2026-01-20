@@ -123,9 +123,12 @@ export async function listReports(req, res) {
           r.created_at,
           s.id AS sample_id,
           s.sample_name,
+          i.indicator_name,
           st.type_name AS sample_type
         FROM reports r
         LEFT JOIN samples s ON s.report_id = r.id AND s.status != 'deleted'
+        LEFT JOIN sample_indicators si ON si.sample_id = s.id
+        LEFT JOIN indicators i ON i.id = si.indicator_id
         LEFT JOIN sample_types st ON st.id = s.sample_type_id
         WHERE
           (@status IS NULL OR r.status = @status)
@@ -147,17 +150,20 @@ export async function listReports(req, res) {
           status: row.status,
           created_at: row.created_at,
           sample_type: row.sample_type,
-          sample_names: [],
+          indicator_names:[],
+          sample_names:[]
         });
       }
-      if (row.sample_name) {
-        reportsMap.get(row.id).sample_names.push(row.sample_name);
-      }
+      const report = reportsMap.get(row.id)
+       if (row.sample_name && !report.sample_names.includes(row.sample_name)) report.sample_names.push(row.sample_name);
+       if (row.indicator_name && !report.indicator_names.includes(row.indicator_name)) report.indicator_names.push(row.indicator_name);
+
     }
     const reports = Array.from(reportsMap.values()).map((report) => ({
       ...report,
       sample_count: report.sample_names.length,
       sample_names: report.sample_names.join(", "),
+      indicator_names: report.indicator_names.join(", ")
     }));
 
     res.json(reports);

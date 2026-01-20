@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs";
+import ExcelJS from "exceljs"
 import { getConnection } from "../config/connection-db.js";
 import sql from "mssql"
 
@@ -6,7 +6,6 @@ export async function generateExcel(req,res){
     const status = req.query.status ?? "all";
     const type = req.query.type ?? "all";
     const search = req.query.search ?? "";
-    console.log(status, type, search)
     try{
         const pool = await getConnection()
         const response = await pool.request()
@@ -14,34 +13,46 @@ export async function generateExcel(req,res){
         // .input('type', sql.NVarChar(50), type)
         // .input('search', sql.NVarChar(100), search)
         .query(`
-            SELECT 
-            r.id,
+            SELECT  
+            r.id,   
             r.report_title,
             r.created_at,
             r.status,
-            s.sample_name,
+            STUFF((SELECT DISTINCT ', ' + s2.sample_name
+            FROM samples s2
+            WHERE s2.report_id = r.id
+            FOR XML PATH(''), TYPE
+            ).value('.', 'NVARCHAR(MAX)'),1,2,'') AS sample_names,
+
             s.sampled_by,
-            i.indicator_name,
+            STUFF((SELECT DISTINCT ', ' + i2.indicator_name
+            FROM samples sx
+            JOIN sample_indicators si2 ON si2.sample_id = sx.id
+            JOIN indicators i2 ON i2.id = si2.indicator_id
+            WHERE sx.report_id = r.id
+            FOR XML PATH(''), TYPE
+            ).value('.', 'NVARCHAR(MAX)'),1,2, '') AS indicator_names,
+
             st.type_name
             FROM reports r
             JOIN samples s ON s.report_id = r.id
             JOIN sample_types st ON st.id = s.sample_type_id
-            JOIN indicators i ON i.id = i.sample_type_id
-            JOIN sample_indicators si ON si.sample_id = s.id
             WHERE (r.status = @status OR r.status != 'deleted')
+            GROUP BY
+            r.id, r.report_title, r.created_at, r.status, st.type_name, s.sampled_by
             ORDER BY r.created_at DESC;
             `)
             const rows = response.recordset
-            const wb = new exceljs.Workbook();
-            const ws = new exceljs.addWorksheet("Reports");
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet("Тайлан")
                 ws.columns = [
       { header: "Он сар", key: "created_at", width: 14 },
       { header: "Дугаар", key: "id", width: 10 },
       { header: "Дээжны нэр", key: "report_title", width: 30 },
       { header: "Оруулсан дээжүүд", key: "sample_names", width: 40 },
+      {header:"Сонгогдсон шинжилгээ", key:"indicator_names", width:40},
       { header: "Байршил", key: "location", width: 25 },
-      { header: "Лаб төрөл", key: "type_name", width: 16 },
-      { header: "Status", key: "status", width: 18 },
+      { header: "Төлөв", key: "status", width: 18 },
     ];
             res.setHeader(
                 "Content-type",
@@ -49,11 +60,25 @@ export async function generateExcel(req,res){
             );
             res.setHeader(
                 "Content-Disposition",
-                `attachment filename="reports.xlsx"`
+                `attachment; filename="reports.xlsx"`
             );
+
+        for(const row of rows){
+          const excelRow =  ws.addRow({
+                created_at: row.created_at,
+                report_title: row.report_title,
+                sample_names:row.sample_names ? row.sample_names.split(",").join("\n") : "",
+                indicator_names:row.indicator_names ? row.indicator_names.split(",").join("\n") : "",
+                location:row.location,
+                status:row.status
+            })
+             excelRow.getCell("sample_names").alignment = {wrapText: true, vertical: "center"}
+             excelRow.getCell("indicator_names").alignment = {wrapText: true, vertical: "center"}
+        }
+
+           
             await wb.xlsx.write(res);
             res.end();
-            console.log("log hiij uzej bn",response)
     }catch(error){
         console.log("error while fetching excel", error.message)
     }
