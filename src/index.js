@@ -4,6 +4,7 @@ import sampleRouter from "./router/indicators.js";
 import cors from "cors";
 import reportsRouter from "./router/reports.js";
 import sampleTypeRouter from "./router/sample-types.js";
+import indicatorsRouter from "./router/indicators.js";
 const app = express();
 
 
@@ -23,6 +24,7 @@ app.use(express.json());
 app.use("/sample", sampleRouter);
 app.use("/reports", reportsRouter);
 app.use("/sample-types", sampleTypeRouter)
+app.use("/indicators",indicatorsRouter)
 
 
 app.get("/", (req, res) => {

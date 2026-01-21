@@ -209,6 +209,7 @@ export async function getReportDetail(req, res) {
           i.unit,
           i.test_method,
           i.limit_value,
+          i.input_type,
 
           tr.id AS test_result_id,
           tr.result_value,
@@ -270,6 +271,7 @@ export async function getReportDetail(req, res) {
         indicator_id: row.indicator_id,
         indicator_name: row.indicator_name,
         unit: row.unit,
+        input_type:row.input_type,
         test_method: row.test_method,
         limit_value: row.limit_value,
         result: row.test_result_id
@@ -304,7 +306,7 @@ export async function getReportDetail(req, res) {
 export async function saveReportResultsBulk(req, res) {
   const reportId = Number(req.params.id);
   const { results } = req.body;
-
+  console.log(results)
   if (!reportId) return res.status(400).json({ message: "Invalid report id" });
   if (!Array.isArray(results) || results.length === 0) {
     return res.status(400).json({ message: "results must be a non-empty array" });
@@ -328,7 +330,7 @@ export async function saveReportResultsBulk(req, res) {
       await reqTx
         .input("reportId", sql.Int, reportId)
         .input("sample_indicator_id", sql.Int, Number(item.sample_indicator_id))
-        .input("result_value", sql.VarChar(100), item.result_value ?? null)
+        .input("result_value", sql.VarChar(100), item.result_value ? item.avg : null)
         .input("is_detected", sql.Bit, item.is_detected ?? null)
         .input("is_within_limit", sql.Bit, item.is_within_limit ?? null)
         .input("equipment_id", sql.NVarChar(100), item.equipment_id ?? null)

@@ -11,7 +11,7 @@ reportsRouter.get("/", listReports); //true
 reportsRouter.put("/results/:id", saveReportResultsBulk);
 reportsRouter.get("/:id", getReportDetail); //true
 reportsRouter.get("/:id/pdf", getReportPdf); //true
-reportsRouter.put("/edit/:id", updateReport)
-reportsRouter.put("/delete/:id", sofDeleteReport)
+reportsRouter.put("/edit/:id", updateReport) //true
+reportsRouter.put("/delete/:id", sofDeleteReport) //true
 // reportsRouter.put("/approve/:id")
 export default reportsRouter;

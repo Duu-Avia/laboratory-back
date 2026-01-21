@@ -49,7 +49,8 @@ export async function getReportPdf(req, res) {
           s.id AS sample_id, s.sample_name,
           i.id AS indicator_id, i.indicator_name, i.test_method, i.limit_value,
           st.type_name,
-          tr.result_value
+          tr.result_value,
+          tr.is_detected
         FROM reports r
        JOIN samples s ON s.report_id = r.id AND s.status != 'deleted'
         JOIN sample_indicators si ON si.sample_id = s.id AND si.status != 'deleted'
@@ -70,7 +71,22 @@ export async function getReportPdf(req, res) {
     const reportYear =  new Date(reportDate).getFullYear();
     const tailanDugaar = `${reportYear}_${reportId}`
     const soritsTodorhoilolt = rows[0].type_name
+    
+    function cellText(row) {
+  // If is_detected exists -> show Mongolian text
+  if (row.is_detected === true) return "Илэрсэн";
+  if (row.is_detected === false) return "Илрээгүй";
 
+  // Otherwise show result_value if exists
+  if (row.result_value !== null && row.result_value !== undefined && String(row.result_value).trim() !== "") {
+    return String(row.result_value);
+  }
+
+  // Else blank
+  return "";
+}
+
+    console.log(rows)
       
     let reportTitle = rows[0].report_title ?? "";
 
@@ -88,7 +104,7 @@ export async function getReportPdf(req, res) {
       }
 
       if (!resultsMap.has(row.indicator_id)) resultsMap.set(row.indicator_id, new Map());
-      resultsMap.get(row.indicator_id).set(row.sample_id, row.result_value ?? "");
+      resultsMap.get(row.indicator_id).set(row.sample_id, cellText(row));
     }
 
     const samples = Array.from(sampleMap.values());
@@ -223,14 +239,15 @@ export async function getReportPdf(req, res) {
   });
 
   sampleBatch.forEach((s, colIndex) => {
-    const val = resultsMap.get(ind.id)?.get(s.id) ?? "";
-    page.drawText(String(val).slice(0, 10), { 
-      x: colX[colIndex]-67, 
-      y,
-      size:8, 
-      font,
-      color: black 
-    });
+ const val = resultsMap.get(ind.id)?.get(s.id) ?? "";
+page.drawText(String(val).slice(0, 10), {
+  x: colX[colIndex] - 67,
+  y,
+  size: 8,
+  font,
+  color: black,
+});
+    console.log(val)
   });
 });;
       }

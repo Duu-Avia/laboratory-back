@@ -32,6 +32,7 @@ async function initDatabase() {
         test_method NVARCHAR(100),
         limit_value NVARCHAR(100),
         is_default BIT DEFAULT 0,
+        input_type VARCHAR(20) DEFAULT 'detected',
         created_at DATETIME DEFAULT GETDATE(),
         updated_at DATETIME DEFAULT GETDATE()
       )
