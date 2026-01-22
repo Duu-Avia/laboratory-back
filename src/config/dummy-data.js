@@ -12,6 +12,8 @@ async function seedData() {
     await pool.request().query(`DELETE FROM sample_indicators`);
     await pool.request().query(`DELETE FROM samples`);
     await pool.request().query(`DELETE FROM indicators`);
+    await pool.request().query(`DELETE FROM location_samples`);
+    await pool.request().query(`DELETE FROM location_packages`);
     await pool.request().query(`DELETE FROM sample_types`);
     console.log("✅ Old data cleared");
 
@@ -65,6 +67,22 @@ async function seedData() {
       (${swabTypeId}, N'Salmonella spp', N'илрэх/илрэхгүй', 'MNS 6410:2018', N'илрэхгүй', 1)
     `);
     console.log("✅ Swab indicators inserted");
+
+    await pool.request().query(`
+      INSERT INTO location_packages (package_name, sample_type_id)
+      VALUES(N'Нэгдсэн оффис боловсруулагдах ус', 1)
+    `)
+      console.log("✅ package names inserted")
+    
+    await pool.request().query(`
+      INSERT INTO location_samples (location_package_id,location_name, sort_order)
+      VALUES (1, N'Нэгдсэн оффис боловсруулагдах ус', 1),
+             (1, N'Нэгдсэн оффис цэвэршүүлсэн ус', 2),
+             (1, N'Нэгдсэн оффис 1-р тогооны ус', 3),
+             (1, N'Галлерей кемп 1-р тогооны ус', 4),
+             (1, N'Галлерей кемп 2-р тогооны ус', 5);
+      `)
+    
 
     console.log("🎉 All seed data inserted!");
     process.exit(0);

@@ -22,13 +22,12 @@ export async function createReportWithSamples(req, res) {
     const reportInsert = await reportReq
       .input("report_title", sql.NVarChar(200), report_title ?? null)
       .input("test_start_date", sql.Date, test_start_date ?? null)
-      .input("test_end_date", sql.Date, test_end_date ?? null)
       .input("approved_by", sql.NVarChar(100), approved_by ?? null)
       .input("analyst", sql.NVarChar(100), analyst ?? null)
       .query(`
-        INSERT INTO reports (report_title, test_start_date, test_end_date, approved_by, analyst, status)
+        INSERT INTO reports (report_title, test_start_date, approved_by, analyst, status)
         OUTPUT INSERTED.id
-        VALUES (@report_title, @test_start_date, @test_end_date, @approved_by, @analyst, 'draft')
+        VALUES (@report_title, @test_start_date, @approved_by, @analyst, 'draft')
       `);
 
     const reportId = reportInsert.recordset[0].id;
@@ -394,6 +393,7 @@ export async function saveReportResultsBulk(req, res) {
     BEGIN
       UPDATE reports
         SET status = 'tested',
+            test_end_date = CAST(GETDATE() AS date),
             updated_at = GETDATE()
       WHERE id = @reportId;
     END

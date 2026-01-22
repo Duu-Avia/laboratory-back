@@ -108,8 +108,29 @@ async function initDatabase() {
       )
     `);
     console.log("✅ test_results table created");
+    
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='location_packages' AND xtype = 'U')
+      CREATE TABLE location_packages (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      package_name NVARCHAR(200) NOT NULL,
+      sample_type_id INT FOREIGN KEY REFERENCES sample_types(id),
+      created_at DATETIME DEFAULT GETDATE(),
+      )
+      `);
+    console.log("✅ location_packages table created")
 
-
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name = 'location_samples' AND xtype= 'U')
+      CREATE TABLE location_samples(
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      location_name NVARCHAR(200) NOT NULL,
+      sort_order INT DEFAULT 0,
+      location_package_id INT FOREIGN KEY REFERENCES location_packages(id)
+      )
+      `)
+    console.log("✅ location_names table created")
+  
   } catch (error) {
     console.log("❌ Failed while creating tables", error);
     process.exit(1);

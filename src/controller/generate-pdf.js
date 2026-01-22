@@ -45,8 +45,8 @@ export async function getReportPdf(req, res) {
       .input("reportId", sql.Int, reportId)
       .query(`
         SELECT
-          r.id AS report_id, r.report_title, r.created_at,
-          s.id AS sample_id, s.sample_name,
+          r.id AS report_id, r.report_title, r.created_at,r.test_start_date, r.test_end_date,
+          s.id AS sample_id, s.sample_name, s.sample_date, sample_amount,
           i.id AS indicator_id, i.indicator_name, i.test_method, i.limit_value,
           st.type_name,
           tr.result_value,
@@ -71,23 +71,28 @@ export async function getReportPdf(req, res) {
     const reportYear =  new Date(reportDate).getFullYear();
     const tailanDugaar = `${reportYear}_${reportId}`
     const soritsTodorhoilolt = rows[0].type_name
+    const endDateConvert = rows[0].test_end_date
+    const startDateConvert = rows[0].test_start_date
+    const sampledDateConvert = rows[0].sample_date
+    const test_start_date = startDateConvert.toISOString().slice(0,10)
+    const test_end_date = endDateConvert.toISOString().slice(0,10)
+    const testedDate = `${test_start_date} - ${test_end_date}`
+    const sampled_date = sampledDateConvert.toISOString().slice(0,10)
+    const sample_amount = rows[0].sample_amount
     
     function cellText(row) {
-  // If is_detected exists -> show Mongolian text
+
   if (row.is_detected === true) return "Илэрсэн";
   if (row.is_detected === false) return "Илрээгүй";
 
-  // Otherwise show result_value if exists
+
   if (row.result_value !== null && row.result_value !== undefined && String(row.result_value).trim() !== "") {
     return String(row.result_value);
   }
 
-  // Else blank
   return "";
 }
 
-    console.log(rows)
-      
     let reportTitle = rows[0].report_title ?? "";
 
     for (const row of rows) {
@@ -120,18 +125,14 @@ export async function getReportPdf(req, res) {
     const sampleEhniiDugaar = sampleId[0];
     const sampleSuuliinDugaar = sampleId[sampleId.length - 1]
     const labDugaar = `${reportId}/${sampleEhniiDugaar}-${sampleSuuliinDugaar}` 
-
     const tableTopY = 290;
     const rowHeight = 25;
     const rowsPerPage = 8;
-
     const noX = 109;
     const indicatorX = 130;
     const standardX = 230;
     const methodX = 309;
-
     const colX = [460, 530, 600];
-
     const sampleBatches = chunk(samples, 3);
     const indicatorChunks = chunk(indicators, rowsPerPage);
 
@@ -141,11 +142,27 @@ export async function getReportPdf(req, res) {
         outDoc.addPage(page);
 
         const sampleCount = sampleBatch.length;
-
-        page.drawText(String(reportTitle).slice(0, 50), { 
+        
+        page.drawText(`Тус бүр ${sample_amount}л`, { 
           x: 140, 
-          y: 500,  
-          size: 8, 
+          y: 385,  
+          size: 9, 
+          font, 
+          color: black 
+        });
+
+        page.drawText(testedDate, { 
+          x: 421, 
+          y: 385,  
+          size: 9, 
+          font, 
+          color: black 
+        });
+
+           page.drawText(sampled_date, { 
+          x: 290, 
+          y: 385,  
+          size: 9, 
           font, 
           color: black 
         });
@@ -176,18 +193,18 @@ export async function getReportPdf(req, res) {
         });
 
         page.drawText(String(soritsTodorhoilolt), { 
-          x: 365, 
+          x: 348, 
           y:539, 
           size: 9, 
           font, 
           color: black 
         })
 
-        let sampleListY = 490; 
+        let sampleListY = 500; 
         let sampleSpacing = sampleCount > 3 ? 8 : 10;
         
         sampleBatch.forEach((s, i) => {
-          page.drawText(String(s.sample_name).slice(0, 50), { 
+          page.drawText(String(`${i + 1}. ${s.id}  ${s.sample_name}`).slice(0, 50), { 
             x: 140, 
             y: sampleListY - (i * sampleSpacing), 
             size: 8, 
@@ -195,7 +212,6 @@ export async function getReportPdf(req, res) {
             color: black 
           });
         });
-
         // Sample IDs in column headers - ALL samples
         sampleBatch.forEach((s, i) => {
           page.drawText(String(s.id), { 
@@ -247,7 +263,6 @@ page.drawText(String(val).slice(0, 10), {
   font,
   color: black,
 });
-    console.log(val)
   });
 });;
       }
