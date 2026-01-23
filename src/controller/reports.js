@@ -120,54 +120,67 @@ export async function listReports(req, res) {
           r.analyst,
           r.status,
           r.created_at,
-          s.id AS sample_id,
-          s.sample_name,
-          i.indicator_name,
-          st.type_name AS sample_type
+          st.type_name AS sample_type,
+
+          -- sample names aggregation (SQL Server 2008)
+          STUFF((
+            SELECT DISTINCT ', ' + s2.sample_name
+            FROM samples s2
+            WHERE s2.report_id = r.id
+              AND s2.status != 'deleted'
+              AND s2.sample_name IS NOT NULL
+            FOR XML PATH(''), TYPE
+          ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS sample_names,
+
+          -- indicator names aggregation (SQL Server 2008)
+          STUFF((
+            SELECT DISTINCT ', ' + i2.indicator_name
+            FROM samples s3
+            JOIN sample_indicators si2 ON si2.sample_id = s3.id
+            JOIN indicators i2 ON i2.id = si2.indicator_id
+            WHERE s3.report_id = r.id
+              AND s3.status != 'deleted'
+              AND si2.status != 'deleted'
+              AND i2.indicator_name IS NOT NULL
+            FOR XML PATH(''), TYPE
+          ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS indicator_names,
+
+          -- sample count
+          (
+            SELECT COUNT(*)
+            FROM (
+              SELECT DISTINCT s4.sample_name
+              FROM samples s4
+              WHERE s4.report_id = r.id
+                AND s4.status != 'deleted'
+                AND s4.sample_name IS NOT NULL
+            ) x
+          ) AS sample_count
+
         FROM reports r
-        LEFT JOIN samples s ON s.report_id = r.id AND s.status != 'deleted'
-        LEFT JOIN sample_indicators si ON si.sample_id = s.id
-        LEFT JOIN indicators i ON i.id = si.indicator_id
-        LEFT JOIN sample_types st ON st.id = s.sample_type_id
+        LEFT JOIN samples s 
+          ON s.report_id = r.id 
+          AND s.status != 'deleted'
+        LEFT JOIN sample_types st 
+          ON st.id = s.sample_type_id
+
         WHERE
-          (@status IS NULL OR r.status = @status)
+          r.status NOT IN('deleted', 'approved')
+          AND (@status IS NULL OR r.status = @status)
           AND (@from IS NULL OR r.test_start_date >= @from)
           AND (@to IS NULL OR r.test_end_date <= @to)
-        ORDER BY r.created_at DESC, r.id, s.id
+
+        GROUP BY
+          r.id, r.report_title, r.test_start_date, r.test_end_date,
+          r.analyst, r.status, r.created_at, st.type_name
+
+        ORDER BY r.created_at DESC;
       `);
 
-    const reportsMap = new Map();
-
-    for (const row of r.recordset) {
-      if (!reportsMap.has(row.id)) {
-        reportsMap.set(row.id, {
-          id: row.id,
-          report_title: row.report_title,
-          test_start_date: row.test_start_date,
-          test_end_date: row.test_end_date,
-          analyst: row.analyst,
-          status: row.status,
-          created_at: row.created_at,
-          sample_type: row.sample_type,
-          indicator_names:[],
-          sample_names:[]
-        });
-      }
-      const report = reportsMap.get(row.id)
-       if (row.sample_name && !report.sample_names.includes(row.sample_name)) report.sample_names.push(row.sample_name);
-       if (row.indicator_name && !report.indicator_names.includes(row.indicator_name)) report.indicator_names.push(row.indicator_name);
-
-    }
-    const reports = Array.from(reportsMap.values()).map((report) => ({
-      ...report,
-      sample_count: report.sample_names.length,
-      sample_names: report.sample_names.join(", "),
-      indicator_names: report.indicator_names.join(", ")
-    }));
-
-    res.json(reports);
+    res.json(r.recordset);
   } catch (err) {
-    res.status(500).json({ message: "Failed to list reports", error: String(err.message ?? err) });
+    console.error(err);
+    res.status(500).json({ message: "Failed to list reports", error: String(err?.message ?? err) });
   }
 }
 
@@ -679,5 +692,92 @@ export async function updateReport(req, res) {
     return res.status(500).json({ message: "Failed to update report", error: String(err.message ?? err) });
   }
 }
+
+
+
+export async function archiveReport(req, res) {
+  const { mode } = req.query; 
+  console.log(mode)
+
+  try {
+    const pool = await getConnection();
+    const response = await pool.request()
+      .input("mode", sql.VarChar(20), mode ?? null)
+      .query(`
+        SELECT
+          r.id,
+          r.report_title,
+          r.approved_by,
+          r.analyst,
+          r.status,
+          r.created_at,
+          r.updated_at,
+          r.test_start_date,
+          r.test_end_date,
+          st.type_name AS sample_type,
+
+          -- sample names aggregation
+          STUFF((
+            SELECT DISTINCT ', ' + s2.sample_name
+            FROM samples s2
+            WHERE s2.report_id = r.id
+              AND s2.sample_name IS NOT NULL
+            FOR XML PATH(''), TYPE
+          ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS sample_names,
+
+          -- indicator names aggregation
+          STUFF((
+            SELECT DISTINCT ', ' + i2.indicator_name
+            FROM samples s3
+            JOIN sample_indicators si2 ON si2.sample_id = s3.id
+            JOIN indicators i2 ON i2.id = si2.indicator_id
+            WHERE s3.report_id = r.id
+              AND i2.indicator_name IS NOT NULL
+            FOR XML PATH(''), TYPE
+          ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS indicator_names,
+
+          -- sample count
+          (
+            SELECT COUNT(*)
+            FROM (
+              SELECT DISTINCT s4.sample_name
+              FROM samples s4
+              WHERE s4.report_id = r.id
+                AND s4.sample_name IS NOT NULL
+            ) x
+          ) AS sample_count
+
+        FROM reports r
+        LEFT JOIN samples s 
+          ON s.report_id = r.id
+        LEFT JOIN sample_types st 
+          ON st.id = s.sample_type_id
+
+        WHERE
+          (
+            (@mode IS NULL AND r.status = 'approved')  -- default view
+            OR r.status = @mode                         -- 'approved' or 'deleted'
+          ) 
+
+        GROUP BY
+          r.id, r.report_title, r.approved_by, r.analyst, r.status,
+          r.created_at, r.updated_at, r.test_start_date, r.test_end_date,
+          st.type_name
+
+        ORDER BY r.created_at DESC;
+      `);
+
+    res.json(response.recordset);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ 
+      message: "Failed to load archive reports", 
+      error: String(err?.message ?? err) 
+    });
+  }
+}
+
+
+
 
 
