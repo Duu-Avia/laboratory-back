@@ -32,7 +32,7 @@ function cellText(row) {
   return "";
 }
 
-/** -------------------- 1) fetch rows -------------------- **/
+/** -------------------- 1) fetch rows ------------------- **/
 async function fetchReportRows(pool, reportId) {
   const r = await pool.request()
     .input("reportId", sql.Int, reportId)

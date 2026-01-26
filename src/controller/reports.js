@@ -104,7 +104,7 @@ export async function createReportWithSamples(req, res) {
 // GET /reports
 export async function listReports(req, res) {
   const { from, to, status } = req.query;
-
+  console.log(status,from,to)
   try {
     const pool = await getConnection();
     const r = await pool.request()
