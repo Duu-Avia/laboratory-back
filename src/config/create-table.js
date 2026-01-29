@@ -130,7 +130,55 @@ async function initDatabase() {
       )
       `)
     console.log("✅ location_names table created")
-  
+
+        // 1 Roles table
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='roles' AND xtype='U')
+      CREATE TABLE roles (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      role_name VARCHAR(50) NOT NULL UNIQUE,
+      description NVARCHAR(200),
+      created_at DATETIME DEFAULT GETDATE()
+    )
+      `) 
+
+    // Permissions table
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='permissions' AND xtype='U')
+      CREATE TABLE permissions (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      permission_key VARCHAR(100) NOT NULL UNIQUE,  -- 'report:create'
+      permission_name NVARCHAR(100),                -- 'Тайлан үүсгэх'
+      module VARCHAR(50),                           -- 'report', 'user', 'sample'
+      created_at DATETIME DEFAULT GETDATE()
+    )
+      `) 
+
+    // Role-Permission mapping
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='role_permissions' AND xtype='U')
+       CREATE TABLE role_permissions (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      role_id INT NOT NULL FOREIGN KEY REFERENCES roles(id),
+      permission_id INT NOT NULL FOREIGN KEY REFERENCES permissions(id),
+      UNIQUE(role_id, permission_id)
+    )`);
+
+    // Users table
+ await pool.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+    CREATE TABLE users (
+    id INT IDENTITY(1,1) PRIMARY KEY,             -- ← Нэмэх (Дараа Keycloak-д) keycloak_id VARCHAR(100) UNIQUE, 
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255),                    
+    full_name NVARCHAR(100),
+    role_id INT FOREIGN KEY REFERENCES roles(id),
+    is_active BIT DEFAULT 1,
+    created_at DATETIME DEFAULT GETDATE(),
+    updated_at DATETIME DEFAULT GETDATE()
+  )
+`);
+    console.log("✅  tables created");
   } catch (error) {
     console.log("❌ Failed while creating tables", error);
     process.exit(1);

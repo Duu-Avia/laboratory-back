@@ -83,7 +83,6 @@ async function seedData() {
              (1, N'Галлерей кемп 2-р тогооны ус', 5);
       `)
     
-
     console.log("🎉 All seed data inserted!");
     process.exit(0);
 
