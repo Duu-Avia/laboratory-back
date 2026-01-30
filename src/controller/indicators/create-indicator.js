@@ -1,4 +1,4 @@
-import { getConnection } from "../config/connection-db.js";
+import { getConnection } from "../../config/connection-db.js";
 import sql from 'mssql'
 
 export async function createIndicator(req,res){

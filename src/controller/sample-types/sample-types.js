@@ -1,4 +1,4 @@
-import { getConnection } from "../config/connection-db.js"; 
+import { getConnection } from "../../config/connection-db.js"; 
 
 export async function getSampleTypes (req, res){
     try{

@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { getConnection } from "../config/connection-db.js";
+import { getConnection } from "../../config/connection-db.js";
 
 // GET /location-packages?sample_type_id=1
 // Тухайн дээжний төрлийн бүх location package-ийг авах

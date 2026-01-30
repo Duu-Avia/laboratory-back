@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getLocationPackageDetail, getLocationPackages, getLocationSamples } from "../controller/get-locations.js";
+import { getLocationPackageDetail, getLocationPackages, getLocationSamples } from "../controller/locations/get-locations.js";
 
 export const locationRouters = Router();
 

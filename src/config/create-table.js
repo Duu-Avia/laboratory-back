@@ -47,9 +47,12 @@ async function initDatabase() {
         report_title NVARCHAR(200),
         test_start_date DATE,
         test_end_date DATE,
-        approved_by NVARCHAR(100),
         analyst NVARCHAR(100),
         status VARCHAR(50) DEFAULT 'draft',
+        approved_by NVARCHAR(100),
+        approved_at DATETIME NULL,
+        signed_by NVARCHAR(100),
+        signed_at DATETIME NULL,
         created_at DATETIME DEFAULT GETDATE(),
         updated_at DATETIME DEFAULT GETDATE()
       )

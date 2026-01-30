@@ -1,5 +1,5 @@
 import sql from "mssql";
-import { getConnection } from "../config/connection-db.js";
+import { getConnection } from "../../config/connection-db.js";
 
 // GET /sample-types/:id/indicators?defaultOnly=1 its indicator
 export async function getIndicatorsBySampleType(req, res) {

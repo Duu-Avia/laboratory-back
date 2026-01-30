@@ -43,6 +43,11 @@ async function fetchReportRows(pool, reportId) {
         r.created_at,
         r.test_start_date,
         r.test_end_date,
+        r.approved_by,
+        r.approved_at,
+        r.signed_by,
+        r.signed_at,
+        r.status AS report_status,
 
         s.id AS sample_id,
         s.sample_name,
@@ -140,6 +145,11 @@ function buildModel(rows, reportId) {
     samples,
     indicators,
     matrix,
+    approved_by: first.approved_by ?? null,
+    approved_at: first.approved_at ? isoDate(first.approved_at) : null,
+    signed_by: first.signed_by ?? null,
+    signed_at: first.signed_at ? isoDate(first.signed_at) : null,
+    report_status: first.report_status ?? "",
   };
 }
 
@@ -274,6 +284,20 @@ function drawIndicatorRows(page, indicatorChunk, sampleBatch, columns, model, fo
   });
 }
 
+function drawSignatures(page, model, font) {
+  const black = rgb(0, 0, 0);
+
+  // Engineer signature (who performed the tests)
+  if (model.signed_by) {
+    page.drawText(model.signed_by, { x: 360, y: 137, size: 9, font, color: black });
+  }
+
+  // Senior engineer approval signature ("Баталсан" area)
+  if (model.report_status === "approved" && model.approved_by) {
+    page.drawText(model.approved_by, { x: 360, y: 116, size: 9, font, color: black });
+  }
+}
+
 /** -------------------- controller -------------------- **/
 export async function getReportPdf(req, res) {
   const reportId = Number(req.params.id);
@@ -315,6 +339,7 @@ export async function getReportPdf(req, res) {
         drawSampleList(page, sampleBatch, font);
         drawSampleHeaders(page, sampleBatch, columns, font);
         drawIndicatorRows(page, indicatorChunk, sampleBatch, columns, model, font);
+        drawSignatures(page, model, font);
       }
     }
 

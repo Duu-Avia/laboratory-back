@@ -10,12 +10,13 @@ import {
 import logger from './utils/logger.js';
 
 // Import routers
-import sampleRouter from './router/indicators.js';
 import reportsRouter from './router/reports.js';
 import sampleTypeRouter from './router/sample-types.js';
 import indicatorsRouter from './router/indicators.js';
 import { locationRouters } from './router/locations.js';
 import routerExample from './router/route-example.js';
+import { authMiddleware } from './middleware/auth-middleware.js';
+import resultsRouter from './router/results.js';
 
 // Initialize Express app
 const app = express();
@@ -89,11 +90,11 @@ app.get('/', (req, res) => {
 //Auth routes
 app.use('/auth',routerExample);
 // Mount routers
-app.use('/sample', sampleRouter);
-app.use('/reports', reportsRouter);
-app.use('/sample-types', sampleTypeRouter);
-app.use('/indicators', indicatorsRouter);
-app.use('/locations', locationRouters);
+app.use('/reports', authMiddleware, reportsRouter);
+app.use('/sample-types',authMiddleware, sampleTypeRouter);
+app.use('/indicators',authMiddleware, indicatorsRouter);
+app.use('/locations',authMiddleware, locationRouters);
+app.use('/results',authMiddleware, resultsRouter);
 
 
 // ==============================================
