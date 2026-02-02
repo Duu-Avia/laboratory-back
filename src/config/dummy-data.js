@@ -14,36 +14,36 @@ async function seedData() {
     await pool.request().query(`DELETE FROM indicators`);
     await pool.request().query(`DELETE FROM location_samples`);
     await pool.request().query(`DELETE FROM location_packages`);
-    await pool.request().query(`DELETE FROM sample_types`);
+    await pool.request().query(`DELETE FROM lab_types`);
     console.log("✅ Old data cleared");
 
-    // 2. Insert Sample Types
+    // 2. Insert Lab Types
     const waterResult = await pool.request().query(`
-      INSERT INTO sample_types (type_code, type_name, standard) 
+      INSERT INTO lab_types (type_code, type_name, standard) 
       OUTPUT INSERTED.id
       VALUES ('WT', N'Унд ахуйн ус', 'MNS 0900:2018')
     `);
     const waterTypeId = waterResult.recordset[0].id;
 
     const airResult = await pool.request().query(`
-      INSERT INTO sample_types (type_code, type_name, standard) 
+      INSERT INTO lab_types (type_code, type_name, standard) 
       OUTPUT INSERTED.id
       VALUES ('AR', N'Агаар', 'MNS 5484:2005')
     `);
     const airTypeId = airResult.recordset[0].id;
 
     const swabResult = await pool.request().query(`
-      INSERT INTO sample_types (type_code, type_name, standard) 
+      INSERT INTO lab_types (type_code, type_name, standard) 
       OUTPUT INSERTED.id
       VALUES ('SW', N'Арчдас', 'MNS 6410:2018')
     `);
     const swabTypeId = swabResult.recordset[0].id;
 
-    console.log("✅ Sample types inserted:", { waterTypeId, airTypeId, swabTypeId });
+    console.log("✅ Lab types inserted:", { waterTypeId, airTypeId, swabTypeId });
 
     // 3. Insert Water Indicators
     await pool.request().query(`
-      INSERT INTO indicators (sample_type_id, indicator_name, unit, test_method, limit_value, is_default) VALUES
+      INSERT INTO indicators (lab_type_id, indicator_name, unit, test_method, limit_value, is_default) VALUES
       (${waterTypeId}, N'Бичил биетний ерөнхий тоо', N'CFU/мл', 'MNS ISO 6222-1998', N'1мл-т 100', 1),
       (${waterTypeId}, N'E.coli', N'илрэх/илрэхгүй', 'MNS ISO 9308-1:1998', N'100мл-т илрэхгүй', 1),
       (${waterTypeId}, N'ГБЭТ нян', N'илрэх/илрэхгүй', 'MNS ISO 19250:2017', N'25мл-т илрэхгүй', 1),
@@ -53,7 +53,7 @@ async function seedData() {
 
     // 4. Insert Air Indicators
     await pool.request().query(`
-      INSERT INTO indicators (sample_type_id, indicator_name, unit, test_method, limit_value, is_default) VALUES
+      INSERT INTO indicators (lab_type_id, indicator_name, unit, test_method, limit_value, is_default) VALUES
       (${airTypeId}, N'Бактерийн нийт тоо', N'CFU/м³', 'MNS 5484:2005', N'1м³-д <50', 1),
       (${airTypeId}, N'Staphylococcus ssp', N'илрэх/илрэхгүй', 'MNS 5484:2005', N'илрэхгүй', 1)
     `);
@@ -61,7 +61,7 @@ async function seedData() {
 
     // 5. Insert Swab Indicators
     await pool.request().query(`
-      INSERT INTO indicators (sample_type_id, indicator_name, unit, test_method, limit_value, is_default) VALUES
+      INSERT INTO indicators (lab_type_id, indicator_name, unit, test_method, limit_value, is_default) VALUES
       (${swabTypeId}, N'Бактерийн нийт тоо', N'CFU/50см²', 'MNS 6410:2018', N'50см²-д <100', 1),
       (${swabTypeId}, N'E.coli', N'илрэх/илрэхгүй', 'MNS 6410:2018', N'илрэхгүй', 1),
       (${swabTypeId}, N'Salmonella spp', N'илрэх/илрэхгүй', 'MNS 6410:2018', N'илрэхгүй', 1)
@@ -69,7 +69,7 @@ async function seedData() {
     console.log("✅ Swab indicators inserted");
 
     await pool.request().query(`
-      INSERT INTO location_packages (package_name, sample_type_id)
+      INSERT INTO location_packages (package_name, lab_type_id)
       VALUES(N'Нэгдсэн оффис боловсруулагдах ус', 1)
     `)
       console.log("✅ package names inserted")

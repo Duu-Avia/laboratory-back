@@ -69,7 +69,7 @@ async function fetchReportRows(pool, reportId) {
       FROM reports r
       JOIN samples s ON s.report_id = r.id AND s.status != 'deleted'
       JOIN sample_indicators si ON si.sample_id = s.id AND si.status != 'deleted'
-      JOIN sample_types st ON st.id = s.sample_type_id
+      JOIN lab_types st ON st.id = s.lab_type_id
       JOIN indicators i ON i.id = si.indicator_id
       LEFT JOIN test_results tr ON tr.sample_indicator_id = si.id
       WHERE r.id = @reportId

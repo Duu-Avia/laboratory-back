@@ -91,7 +91,6 @@ uploads/
 !uploads/.gitkeep
 
 # Generated reports
-reports/
 !reports/.gitkeep
 
 # Temporary files

@@ -1,23 +1,23 @@
 import sql from "mssql";
 import { getConnection } from "../../config/connection-db.js";
 
-// GET /location-packages?sample_type_id=1
+// GET /location-packages?lab_type_id=1
 // Тухайн дээжний төрлийн бүх location package-ийг авах
 export async function getLocationPackages(req, res) {
-  const { sample_type_id } = req.query;
+  const { lab_type_id } = req.query;
   try {
     const pool = await getConnection();
     let query = `
-      SELECT id, package_name, sample_type_id, created_at
+      SELECT id, package_name, lab_type_id, created_at
       FROM location_packages
     `;
 
     const request = pool.request();
 
-    // sample_type_id байвал filter хийх
-    if (sample_type_id) {
-      query += ` WHERE sample_type_id = @sample_type_id`;
-      request.input("sample_type_id", sql.Int, sample_type_id);
+    // lab_type_id байвал filter хийх
+    if (lab_type_id) {
+      query += ` WHERE lab_type_id = @lab_type_id`;
+      request.input("lab_type_id", sql.Int, lab_type_id);
     }
 
     query += ` ORDER BY package_name`;
@@ -73,7 +73,7 @@ export async function getLocationPackageDetail(req, res) {
     const packageResult = await pool.request()
       .input("packageId", sql.Int, packageId)
       .query(`
-        SELECT id, package_name, sample_type_id, created_at
+        SELECT id, package_name, lab_type_id, created_at
         FROM location_packages
         WHERE id = @packageId
       `);

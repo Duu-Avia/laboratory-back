@@ -7,10 +7,10 @@ async function initDatabase() {
   try {
     const pool = await getConnection();
 
-    // 1. Sample Types
+    // 1. Lab Types
     await pool.request().query(`
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sample_types' AND xtype='U')
-      CREATE TABLE sample_types (
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='lab_types' AND xtype='U')
+      CREATE TABLE lab_types (
         id INT IDENTITY(1,1) PRIMARY KEY,
         type_code VARCHAR(10) NOT NULL,
         type_name NVARCHAR(100) NOT NULL,
@@ -19,14 +19,13 @@ async function initDatabase() {
         updated_at DATETIME DEFAULT GETDATE()
       )
     `);
-    console.log("✅ sample_types table created");
-
+    console.log("✅ lab_types table created");
     // 2. Indicators
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='indicators' AND xtype='U')
       CREATE TABLE indicators (
         id INT IDENTITY(1,1) PRIMARY KEY,
-        sample_type_id INT FOREIGN KEY REFERENCES sample_types(id),
+        lab_type_id INT FOREIGN KEY REFERENCES lab_types(id),
         indicator_name NVARCHAR(200) NOT NULL,
         unit NVARCHAR(50),
         test_method NVARCHAR(100),
@@ -49,6 +48,7 @@ async function initDatabase() {
         test_end_date DATE,
         analyst NVARCHAR(100),
         status VARCHAR(50) DEFAULT 'draft',
+        assigned_to INT NULL,
         approved_by NVARCHAR(100),
         approved_at DATETIME NULL,
         signed_by NVARCHAR(100),
@@ -64,7 +64,7 @@ async function initDatabase() {
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='samples' AND xtype='U')
       CREATE TABLE samples (
         id INT IDENTITY(1,1) PRIMARY KEY,
-        sample_type_id INT FOREIGN KEY REFERENCES sample_types(id),
+        lab_type_id INT FOREIGN KEY REFERENCES lab_types(id),
         report_id INT FOREIGN KEY REFERENCES reports(id),
         sample_name NVARCHAR(300) NOT NULL,
         sample_amount VARCHAR(50),
@@ -117,7 +117,7 @@ async function initDatabase() {
       CREATE TABLE location_packages (
       id INT IDENTITY(1,1) PRIMARY KEY,
       package_name NVARCHAR(200) NOT NULL,
-      sample_type_id INT FOREIGN KEY REFERENCES sample_types(id),
+      lab_type_id INT FOREIGN KEY REFERENCES lab_types(id),
       created_at DATETIME DEFAULT GETDATE(),
       )
       `);
@@ -181,6 +181,25 @@ async function initDatabase() {
     updated_at DATETIME DEFAULT GETDATE()
   )
 `);
+    // User-Lab Type mapping (which user belongs to which lab type)
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='user_lab_types' AND xtype='U')
+      CREATE TABLE user_lab_types (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
+        lab_type_id INT NOT NULL FOREIGN KEY REFERENCES lab_types(id),
+        created_at DATETIME DEFAULT GETDATE(),
+        UNIQUE(user_id, lab_type_id)
+      )
+    `);
+    console.log("✅ user_lab_types table created");
+
+    // Add assigned_to column if not exists (for existing databases)
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('reports') AND name = 'assigned_to')
+        ALTER TABLE reports ADD assigned_to INT NULL;
+    `);
+
     console.log("✅  tables created");
   } catch (error) {
     console.log("❌ Failed while creating tables", error);

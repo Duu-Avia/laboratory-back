@@ -15,7 +15,7 @@ export async function getAllIndicators(req, res){
         i.input_type,
         i.created_at,
         i.updated_at,
-        i.sample_type_id
+        i.lab_type_id
         FROM indicators i
         `)
         const rows = response.recordset;

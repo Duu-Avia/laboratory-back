@@ -16,7 +16,7 @@ export const createIndicatorSchema = {
       maxLength: 255,
       message: 'Indicator name is required',
     },
-    sample_type_id: {
+    lab_type_id: {
       required: true,
       type: 'number',
       min: 1,

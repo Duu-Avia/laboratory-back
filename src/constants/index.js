@@ -26,7 +26,7 @@ export const SAMPLE_STATUS = {
 /**
  * Sample types
  */
-export const SAMPLE_TYPES = {
+export const lab_typeS = {
   WATER: 'water',
   AIR: 'air',
   SWAB: 'swab',
@@ -80,7 +80,7 @@ export const DATE_FORMATS = {
 export default {
   REPORT_STATUS,
   SAMPLE_STATUS,
-  SAMPLE_TYPES,
+  lab_typeS,
   INPUT_TYPES,
   HTTP_STATUS,
   PAGINATION,

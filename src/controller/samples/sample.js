@@ -17,7 +17,7 @@ export async function getIndicatorsBySampleType(req, res) {
         .query(`
           SELECT id, indicator_name, unit, test_method, limit_value
           FROM indicators
-          WHERE sample_type_id = @sampleTypeId AND is_default = 1
+          WHERE lab_type_id = @sampleTypeId AND is_default = 1
           ORDER BY indicator_name
         `);
 
@@ -29,7 +29,7 @@ export async function getIndicatorsBySampleType(req, res) {
       .query(`
         SELECT id, indicator_name, unit, test_method, limit_value, is_default
         FROM indicators
-        WHERE sample_type_id = @sampleTypeId
+        WHERE lab_type_id = @sampleTypeId
         ORDER BY indicator_name
       `);
 

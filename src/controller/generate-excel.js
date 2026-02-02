@@ -36,7 +36,7 @@ export async function generateExcel(req,res){
             st.type_name
             FROM reports r
             JOIN samples s ON s.report_id = r.id
-            JOIN sample_types st ON st.id = s.sample_type_id
+            JOIN lab_types st ON st.id = s.lab_type_id
             WHERE (r.status = @status OR r.status != 'deleted')
             GROUP BY
             r.id, r.report_title, r.created_at, r.status, st.type_name, s.sampled_by

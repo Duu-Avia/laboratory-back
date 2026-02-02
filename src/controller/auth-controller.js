@@ -59,6 +59,17 @@ export async function login(req, res) {
 
     const permissions = permResult.recordset.map(p => p.permission_key);
 
+    // Lab types авах
+    const labTypeResult = await pool.request()
+      .input("userId", sql.Int, user.id)
+      .query(`
+        SELECT lt.id, lt.type_code, lt.type_name
+        FROM user_lab_types ult
+        JOIN lab_types lt ON lt.id = ult.lab_type_id
+        WHERE ult.user_id = @userId
+      `);
+    const lab_types = labTypeResult.recordset;
+
     // JWT token үүсгэх
     const token = jwt.sign(
       {
@@ -80,6 +91,7 @@ export async function login(req, res) {
         full_name: user.full_name,
         role: user.role_name,
         permissions,
+        lab_types,
       },
     });
   } catch (err) {
@@ -121,12 +133,24 @@ export async function getMe(req, res) {
 
     const permissions = permResult.recordset.map(p => p.permission_key);
 
+    // Lab types авах
+    const labTypeResult = await pool.request()
+      .input("userId2", sql.Int, user.id)
+      .query(`
+        SELECT lt.id, lt.type_code, lt.type_name
+        FROM user_lab_types ult
+        JOIN lab_types lt ON lt.id = ult.lab_type_id
+        WHERE ult.user_id = @userId2
+      `);
+    const lab_types = labTypeResult.recordset;
+
     res.json({
       id: user.id,
       email: user.email,
       full_name: user.full_name,
       role: user.role_name,
       permissions,
+      lab_types,
     });
   } catch (err) {
     console.error("GetMe error:", err);

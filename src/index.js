@@ -11,12 +11,13 @@ import logger from './utils/logger.js';
 
 // Import routers
 import reportsRouter from './router/reports.js';
-import sampleTypeRouter from './router/sample-types.js';
 import indicatorsRouter from './router/indicators.js';
 import { locationRouters } from './router/locations.js';
 import routerExample from './router/route-example.js';
+import usersRouter from './router/users.js';
 import { authMiddleware } from './middleware/auth-middleware.js';
 import resultsRouter from './router/results.js';
+import labTypeRouter from './router/lab-types.js';
 
 // Initialize Express app
 const app = express();
@@ -80,7 +81,7 @@ app.get('/', (req, res) => {
       ready: '/ready',
       reports: '/reports',
       samples: '/sample',
-      sampleTypes: '/sample-types',
+      labTypes: '/lab-types',
       indicators: '/indicators',
       locations: '/locations',
     },
@@ -91,10 +92,11 @@ app.get('/', (req, res) => {
 app.use('/auth',routerExample);
 // Mount routers
 app.use('/reports', authMiddleware, reportsRouter);
-app.use('/sample-types',authMiddleware, sampleTypeRouter);
+app.use('/lab-types',authMiddleware, labTypeRouter);
 app.use('/indicators',authMiddleware, indicatorsRouter);
 app.use('/locations',authMiddleware, locationRouters);
 app.use('/results',authMiddleware, resultsRouter);
+app.use('/users', authMiddleware, usersRouter);
 
 
 // ==============================================
