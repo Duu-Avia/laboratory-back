@@ -38,10 +38,13 @@ export async function login(req, res) {
       return res.status(401).json({ message: "Хэрэглэгч идэвхгүй байна" });
     }
 
-    // Password шалгах (Одоо: plain text, Дараа: bcrypt)
-    // TODO: Production-д bcrypt.compare() ашиглах
-    const isValidPassword = user.password_hash === password;
-    // const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    // Bcrypt or legacy plain text check
+    let isValidPassword;
+    if (user.password_hash.startsWith("$2")) {
+      isValidPassword = await bcrypt.compare(password, user.password_hash);
+    } else {
+      isValidPassword = user.password_hash === password;
+    }
 
     if (!isValidPassword) {
       return res.status(401).json({ message: "Email эсвэл password буруу" });

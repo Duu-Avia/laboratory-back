@@ -731,13 +731,17 @@ export async function updateReport(req, res) {
 
 
 export async function archiveReport(req, res) {
-  const { mode } = req.query; 
-  console.log(mode)
+  const { mode } = req.query;
 
   try {
     const pool = await getConnection();
+    const userId = req.user.userId;
+    const roleName = req.user.roleName;
+
     const response = await pool.request()
       .input("mode", sql.VarChar(20), mode ?? null)
+      .input("userId", sql.Int, userId)
+      .input("roleName", sql.VarChar(50), roleName)
       .query(`
         SELECT
           r.id,
@@ -783,16 +787,26 @@ export async function archiveReport(req, res) {
           ) AS sample_count
 
         FROM reports r
-        LEFT JOIN samples s 
+        LEFT JOIN samples s
           ON s.report_id = r.id
-        LEFT JOIN lab_types lt 
+        LEFT JOIN lab_types lt
           ON lt.id = s.lab_type_id
 
         WHERE
           (
-            (@mode IS NULL AND r.status = 'approved')  -- default view
-            OR r.status = @mode                         -- 'approved' or 'deleted'
-          ) 
+            (@mode IS NULL AND r.status = 'approved')
+            OR r.status = @mode
+          )
+          AND (
+            -- Archive (approved) → everyone can see
+            (@mode IS NULL OR @mode = 'approved')
+            OR
+            -- Approve requests (signed) → only assigned senior or superadmin
+            (
+              @roleName = 'superadmin'
+              OR r.assigned_to = @userId
+            )
+          )
 
         GROUP BY
           r.id, r.report_title, r.approved_by, r.analyst, r.status,
@@ -805,9 +819,9 @@ export async function archiveReport(req, res) {
     res.json(response.recordset);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ 
-      message: "Failed to load archive reports", 
-      error: String(err?.message ?? err) 
+    res.status(500).json({
+      message: "Failed to load archive reports",
+      error: String(err?.message ?? err)
     });
   }
 }
