@@ -27,7 +27,7 @@ usersRouter.post("/", checkPermission("user:create"), createUser);
 // === Parameterized routes (must come after static paths) ===
 usersRouter.get("/:id", checkPermission("user:read"), getUserById);
 usersRouter.put("/:id", checkPermission("user:update"), updateUser);
-usersRouter.delete("/:id", checkPermission("user:delete"), deactivateUser);
+usersRouter.put("/:id/deactive", checkPermission("user:delete"), deactivateUser);
 usersRouter.put("/:id/password", checkPermission("user:update"), resetUserPassword);
 usersRouter.put("/:id/role", checkPermission("user:assign_role"), changeUserRole);
 usersRouter.get("/:id/lab-types", getUserLabTypes);

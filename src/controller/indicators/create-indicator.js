@@ -3,7 +3,6 @@ import sql from 'mssql'
 
 export async function createIndicator(req,res){
     const {lab_type_id, indicator_name, unit, test_method, limit_value, is_default} = req.body;
-    console.log(indicator_name)
     try{
     const pool = await getConnection()
     const response = await pool.request()

@@ -20,7 +20,6 @@ const rolesMap = {};
     }));
 
     res.json(roles);
-    console.log(roles)
   } catch (err) {
     console.error("roles error:", err);
     res.status(500).json({ message: "Алдаа гарлаа", error: String(err.message ?? err) });

@@ -25,10 +25,11 @@ export async function createReportWithSamples(req, res) {
       .input("approved_by", sql.NVarChar(100), approved_by ?? null)
       .input("analyst", sql.NVarChar(100), analyst ?? null)
       .input("assigned_to", sql.Int, assigned_to ?? null)
+      .input("created_by", sql.Int, req.user.userId)
       .query(`
-        INSERT INTO reports (report_title, test_start_date, approved_by, analyst, assigned_to, status)
+        INSERT INTO reports (report_title, test_start_date, approved_by, analyst, assigned_to, created_by, status)
         OUTPUT INSERTED.id
-        VALUES (@report_title, @test_start_date, @approved_by, @analyst, @assigned_to, 'draft')
+        VALUES (@report_title, @test_start_date, @approved_by, @analyst, @assigned_to, @created_by, 'draft')
       `);
 
     const reportId = reportInsert.recordset[0].id;
@@ -124,6 +125,8 @@ export async function listReports(req, res) {
           r.analyst,
           r.status,
           r.created_at,
+          r.created_by,
+          u_creator.full_name AS created_by_name,
           r.assigned_to,
           u_assigned.full_name AS assigned_to_name,
           lt.type_name AS lab_type,
@@ -171,6 +174,8 @@ export async function listReports(req, res) {
           ON lt.id = s.lab_type_id
         LEFT JOIN users u_assigned
           ON u_assigned.id = r.assigned_to
+        LEFT JOIN users u_creator
+          ON u_creator.id = r.created_by
 
         WHERE
           r.status NOT IN('deleted', 'approved')
@@ -202,7 +207,8 @@ export async function listReports(req, res) {
 
         GROUP BY
           r.id, r.report_title, r.test_start_date, r.test_end_date,
-          r.analyst, r.status, r.created_at, r.assigned_to, u_assigned.full_name, lt.type_name
+          r.analyst, r.status, r.created_at, r.created_by, u_creator.full_name,
+          r.assigned_to, u_assigned.full_name, lt.type_name
 
         ORDER BY r.created_at DESC;
       `);
@@ -233,6 +239,7 @@ export async function getReportDetail(req, res) {
           r.approved_by,
           r.analyst,
           r.status AS report_status,
+          r.created_by,
           r.assigned_to,
           u_assigned.full_name AS assigned_to_name,
 
@@ -288,6 +295,7 @@ export async function getReportDetail(req, res) {
       approved_by: first.approved_by,
       analyst: first.analyst,
       status: first.report_status,
+      created_by: first.created_by,
       assigned_to: first.assigned_to,
       assigned_to_name: first.assigned_to_name,
     };
@@ -353,7 +361,6 @@ export async function getReportDetail(req, res) {
 export async function saveReportResultsBulk(req, res) {
   const reportId = Number(req.params.id);
   const { results } = req.body;
-  console.log(results)
   if (!reportId) return res.status(400).json({ message: "Invalid report id" });
   if (!Array.isArray(results) || results.length === 0) {
     return res.status(400).json({ message: "results must be a non-empty array" });
@@ -470,12 +477,19 @@ export async function sofDeleteReport(req, res) {
 
     const checkStatus = await pool.request()
     .input("reportId", sql.Int, reportId)
-    .query(`SELECT status FROM reports WHERE id = @reportId`)
-    
-    if (checkStatus.length === 0){
+    .query(`SELECT status, created_by FROM reports WHERE id = @reportId`)
+
+    if (!checkStatus.recordset || checkStatus.recordset.length === 0){
       return res.status(400).json({message:'Report not found'})
     }
-    
+
+    // Only the report creator, admin, or superadmin can delete
+    const reportCreatedBy = checkStatus.recordset[0].created_by;
+    const { userId, roleName } = req.user;
+    if (roleName !== "superadmin" && roleName !== "admin" && reportCreatedBy !== userId) {
+      return res.status(403).json({ message: "Зөвхөн тайлан үүсгэсэн инженер эсвэл админ устгах боломжтой" });
+    }
+
     await pool.request()
     .input("reportId", sql.Int, reportId)
     .query(`
@@ -512,11 +526,17 @@ export async function updateReport(req, res) {
     // Check report exists and not approved
     const check = await pool.request()
       .input("reportId", sql.Int, reportId)
-      .query(`SELECT status FROM reports WHERE id = @reportId`);
+      .query(`SELECT status, created_by FROM reports WHERE id = @reportId`);
 
     const currentStatus = check.recordset?.[0]?.status;
+    const createdBy = check.recordset?.[0]?.created_by;
     if (!currentStatus) return res.status(404).json({ message: "Report not found" });
     if (currentStatus === "approved") return res.status(400).json({ message: "Cannot edit approved report" });
+
+    // Only the report creator, admin, or superadmin can edit
+    if (req.user.roleName !== "superadmin" && req.user.roleName !== "admin" && createdBy !== req.user.userId) {
+      return res.status(403).json({ message: "Зөвхөн тайлан үүсгэсэн инженер эсвэл админ засварлах боломжтой" });
+    }
 
     await tx.begin(sql.ISOLATION_LEVEL.READ_COMMITTED);
 

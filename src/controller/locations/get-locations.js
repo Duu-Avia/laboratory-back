@@ -34,7 +34,6 @@ export async function getLocationPackages(req, res) {
 // Тухайн package-ийн бүх sample нэрсийг авах
 export async function getLocationSamples(req, res) {
   const packageId = Number(req.params.id);
-  console.log(req.params.id)
   if (!packageId) {
     return res.status(400).json({ message: "Invalid package id" });
   }

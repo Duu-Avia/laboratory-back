@@ -43,7 +43,7 @@ export async function signReport(req, res) {
     // 2) Check report exists and is in 'tested' status
     const reportResult = await pool.request()
       .input("reportId", sql.Int, reportId)
-      .query(`SELECT id, status FROM reports WHERE id = @reportId`);
+      .query(`SELECT id, status, created_by FROM reports WHERE id = @reportId`);
 
     const report = reportResult.recordset[0];
     if (!report) {
@@ -53,6 +53,13 @@ export async function signReport(req, res) {
       return res.status(400).json({
         message: "Зөвхөн шинжилгээ дууссан тайланд гарын үсэг зурах боломжтой",
         current_status: report.status,
+      });
+    }
+
+    // Only the report creator can sign
+    if (report.created_by !== req.user.userId) {
+      return res.status(403).json({
+        message: "Зөвхөн тайлан үүсгэсэн инженер гарын үсэг зурах боломжтой",
       });
     }
 

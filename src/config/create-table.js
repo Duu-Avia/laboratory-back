@@ -49,6 +49,7 @@ async function initDatabase() {
         analyst NVARCHAR(100),
         status VARCHAR(50) DEFAULT 'draft',
         assigned_to INT NULL,
+        created_by INT NULL,
         approved_by NVARCHAR(100),
         approved_at DATETIME NULL,
         signed_by NVARCHAR(100),
@@ -198,6 +199,21 @@ async function initDatabase() {
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('reports') AND name = 'assigned_to')
         ALTER TABLE reports ADD assigned_to INT NULL;
+    `);
+
+    // Add created_by column if not exists (report ownership)
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('reports') AND name = 'created_by')
+        ALTER TABLE reports ADD created_by INT NULL;
+    `);
+
+    // Backfill created_by from analyst name for existing reports
+    await pool.request().query(`
+      UPDATE r
+      SET r.created_by = u.id
+      FROM reports r
+      JOIN users u ON u.full_name = r.analyst
+      WHERE r.created_by IS NULL AND r.analyst IS NOT NULL
     `);
 
     console.log("✅  tables created");
