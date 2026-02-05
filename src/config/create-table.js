@@ -12,9 +12,9 @@ async function initDatabase() {
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='lab_types' AND xtype='U')
       CREATE TABLE lab_types (
         id INT IDENTITY(1,1) PRIMARY KEY,
-        type_code VARCHAR(10) NOT NULL,
         type_name NVARCHAR(100) NOT NULL,
         standard NVARCHAR(100),
+        is_active BIT DEFAULT 1,
         created_at DATETIME DEFAULT GETDATE(),
         updated_at DATETIME DEFAULT GETDATE()
       )
@@ -112,25 +112,27 @@ async function initDatabase() {
       )
     `);
     console.log("✅ test_results table created");
-    
+   // 7. Location  
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='location_packages' AND xtype = 'U')
       CREATE TABLE location_packages (
       id INT IDENTITY(1,1) PRIMARY KEY,
       package_name NVARCHAR(200) NOT NULL,
       lab_type_id INT FOREIGN KEY REFERENCES lab_types(id),
+      is_active BIT DEFAULT 1,
       created_at DATETIME DEFAULT GETDATE(),
       )
       `);
     console.log("✅ location_packages table created")
-
+      // 8. Location Samples
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name = 'location_samples' AND xtype= 'U')
       CREATE TABLE location_samples(
       id INT IDENTITY(1,1) PRIMARY KEY,
       location_name NVARCHAR(200) NOT NULL,
       sort_order INT DEFAULT 0,
-      location_package_id INT FOREIGN KEY REFERENCES location_packages(id)
+      location_package_id INT FOREIGN KEY REFERENCES location_packages(id),
+      is_active BIT DEFAULT 1
       )
       `)
     console.log("✅ location_names table created")

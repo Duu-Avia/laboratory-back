@@ -10,13 +10,14 @@ export async function getLocationPackages(req, res) {
     let query = `
       SELECT id, package_name, lab_type_id, created_at
       FROM location_packages
+      WHERE is_active = 1
     `;
 
     const request = pool.request();
 
     // lab_type_id байвал filter хийх
     if (lab_type_id) {
-      query += ` WHERE lab_type_id = @lab_type_id`;
+      query += ` AND lab_type_id = @lab_type_id`;
       request.input("lab_type_id", sql.Int, lab_type_id);
     }
 
@@ -45,7 +46,7 @@ export async function getLocationSamples(req, res) {
       .query(`
         SELECT id, location_name, sort_order
         FROM location_samples
-        WHERE location_package_id = @packageId
+        WHERE location_package_id = @packageId AND is_active = 1
         ORDER BY sort_order, id
       `);
 
@@ -74,7 +75,7 @@ export async function getLocationPackageDetail(req, res) {
       .query(`
         SELECT id, package_name, lab_type_id, created_at
         FROM location_packages
-        WHERE id = @packageId
+        WHERE id = @packageId AND is_active = 1
       `);
 
     if (packageResult.recordset.length === 0) {
@@ -87,7 +88,7 @@ export async function getLocationPackageDetail(req, res) {
       .query(`
         SELECT id, location_name, sort_order
         FROM location_samples
-        WHERE location_package_id = @packageId
+        WHERE location_package_id = @packageId AND is_active = 1
         ORDER BY sort_order, id
       `);
 

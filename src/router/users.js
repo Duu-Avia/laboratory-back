@@ -6,7 +6,6 @@ import {
   getAllUsers, getUserById, createUser, updateUser,
   resetUserPassword, deactivateUser, changeUserRole
 } from "../controller/users/users.js";
-import { get } from "node:http";
 import { getAllRoles } from "../controller/users/get-roles.js";
 
 const usersRouter = Router();

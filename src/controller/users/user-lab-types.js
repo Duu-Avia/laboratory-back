@@ -47,7 +47,7 @@ export async function getUserLabTypes(req, res) {
     const result = await pool.request()
       .input("userId", sql.Int, userId)
       .query(`
-        SELECT lt.id, lt.type_code, lt.type_name
+        SELECT lt.id, lt.type_name
         FROM user_lab_types ult
         JOIN lab_types lt ON lt.id = ult.lab_type_id
         WHERE ult.user_id = @userId

@@ -66,7 +66,7 @@ export async function login(req, res) {
     const labTypeResult = await pool.request()
       .input("userId", sql.Int, user.id)
       .query(`
-        SELECT lt.id, lt.type_code, lt.type_name
+        SELECT lt.id, lt.type_name
         FROM user_lab_types ult
         JOIN lab_types lt ON lt.id = ult.lab_type_id
         WHERE ult.user_id = @userId
@@ -140,7 +140,7 @@ export async function getMe(req, res) {
     const labTypeResult = await pool.request()
       .input("userId2", sql.Int, user.id)
       .query(`
-        SELECT lt.id, lt.type_code, lt.type_name
+        SELECT lt.id, lt.type_name
         FROM user_lab_types ult
         JOIN lab_types lt ON lt.id = ult.lab_type_id
         WHERE ult.user_id = @userId2

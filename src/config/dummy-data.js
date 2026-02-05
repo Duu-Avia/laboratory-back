@@ -19,23 +19,23 @@ async function seedData() {
 
     // 2. Insert Lab Types
     const waterResult = await pool.request().query(`
-      INSERT INTO lab_types (type_code, type_name, standard) 
+      INSERT INTO lab_types (type_name, standard)
       OUTPUT INSERTED.id
-      VALUES ('WT', N'Унд ахуйн ус', 'MNS 0900:2018')
+      VALUES (N'Унд ахуйн ус', 'MNS 0900:2018')
     `);
     const waterTypeId = waterResult.recordset[0].id;
 
     const airResult = await pool.request().query(`
-      INSERT INTO lab_types (type_code, type_name, standard) 
+      INSERT INTO lab_types (type_name, standard)
       OUTPUT INSERTED.id
-      VALUES ('AR', N'Агаар', 'MNS 5484:2005')
+      VALUES (N'Агаар', 'MNS 5484:2005')
     `);
     const airTypeId = airResult.recordset[0].id;
 
     const swabResult = await pool.request().query(`
-      INSERT INTO lab_types (type_code, type_name, standard) 
+      INSERT INTO lab_types (type_name, standard)
       OUTPUT INSERTED.id
-      VALUES ('SW', N'Арчдас', 'MNS 6410:2018')
+      VALUES (N'Арчдас', 'MNS 6410:2018')
     `);
     const swabTypeId = swabResult.recordset[0].id;
 

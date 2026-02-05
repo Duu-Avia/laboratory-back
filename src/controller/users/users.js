@@ -62,7 +62,7 @@ export async function getProfile(req, res) {
       .request()
       .input("userId2", sql.Int, user.id)
       .query(
-        `SELECT lt.id, lt.type_code, lt.type_name
+        `SELECT lt.id, lt.type_name
          FROM user_lab_types ult JOIN lab_types lt ON lt.id = ult.lab_type_id
          WHERE ult.user_id = @userId2`
       );
@@ -212,7 +212,7 @@ export async function getAllUsers(req, res) {
 
     // Fetch lab types for all users in one query
     const labResult = await pool.request().query(`
-      SELECT ult.user_id, lt.id, lt.type_code, lt.type_name
+      SELECT ult.user_id, lt.id, lt.type_name
       FROM user_lab_types ult
       JOIN lab_types lt ON lt.id = ult.lab_type_id
     `);
@@ -220,7 +220,7 @@ export async function getAllUsers(req, res) {
     const labMap = {};
     for (const row of labResult.recordset) {
       if (!labMap[row.user_id]) labMap[row.user_id] = [];
-      labMap[row.user_id].push({ id: row.id, type_code: row.type_code, type_name: row.type_name });
+      labMap[row.user_id].push({ id: row.id, type_name: row.type_name });
     }
 
     const users = result.recordset.map((u) => ({
@@ -260,7 +260,7 @@ export async function getUserById(req, res) {
       .request()
       .input("userId", sql.Int, targetId)
       .query(
-        `SELECT lt.id, lt.type_code, lt.type_name
+        `SELECT lt.id, lt.type_name
          FROM user_lab_types ult JOIN lab_types lt ON lt.id = ult.lab_type_id
          WHERE ult.user_id = @userId`
       );
