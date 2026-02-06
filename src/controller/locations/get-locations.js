@@ -57,6 +57,75 @@ export async function getLocationSamples(req, res) {
   }
 }
 
+// GET /location-packages/all-with-samples
+// Бүх package болон тэдгээрийн sample нэрсийг нэг дор авах
+export async function getAllPackagesWithSamples(req, res) {
+  const { lab_type_id } = req.query;
+
+  try {
+    const pool = await getConnection();
+
+    // Get all packages
+    let packageQuery = `
+      SELECT id, package_name, lab_type_id, created_at
+      FROM location_packages
+      WHERE is_active = 1
+    `;
+
+    const packageRequest = pool.request();
+
+    if (lab_type_id) {
+      packageQuery += ` AND lab_type_id = @lab_type_id`;
+      packageRequest.input("lab_type_id", sql.Int, lab_type_id);
+    }
+
+    packageQuery += ` ORDER BY package_name`;
+
+    const packagesResult = await packageRequest.query(packageQuery);
+    const packages = packagesResult.recordset;
+
+    // If no packages found, return empty array
+    if (packages.length === 0) {
+      return res.json([]);
+    }
+
+    // Get all samples for the returned packages
+    const packageIds = packages.map(pkg => pkg.id);
+    const samplesResult = await pool.request()
+      .input("packageIds", sql.VarChar, packageIds.join(','))
+      .query(`
+        SELECT id, location_name, sort_order, location_package_id
+        FROM location_samples
+        WHERE is_active = 1 AND location_package_id IN (${packageIds.join(',')})
+        ORDER BY location_package_id, sort_order, id
+      `);
+
+    // Group samples by package_id
+    const samplesByPackage = samplesResult.recordset.reduce((acc, sample) => {
+      if (!acc[sample.location_package_id]) {
+        acc[sample.location_package_id] = [];
+      }
+      acc[sample.location_package_id].push({
+        id: sample.id,
+        location_name: sample.location_name,
+        sort_order: sample.sort_order
+      });
+      return acc;
+    }, {});
+
+    // Combine packages with their samples
+    const packagesWithSamples = packages.map(pkg => ({
+      ...pkg,
+      samples: samplesByPackage[pkg.id] || []
+    }));
+
+    res.json(packagesWithSamples);
+  } catch (err) {
+    console.error("Error fetching all packages with samples:", err);
+    res.status(500).json({ message: "Failed to fetch packages with samples", error: String(err.message) });
+  }
+}
+
 // GET /location-packages/:id (package + samples хамт)
 // Нэг package-ийн бүх мэдээллийг авах
 export async function getLocationPackageDetail(req, res) {

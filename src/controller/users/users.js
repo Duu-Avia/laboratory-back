@@ -41,7 +41,7 @@ export async function getProfile(req, res) {
       .input("userId", sql.Int, req.user.userId)
       .query(
         `SELECT u.id, u.email, u.full_name, u.role_id, u.is_active, u.created_at,
-                r.role_name
+                r.role_name, position_name
          FROM users u JOIN roles r ON r.id = u.role_id
          WHERE u.id = @userId`
       );
@@ -71,6 +71,7 @@ export async function getProfile(req, res) {
       id: user.id,
       email: user.email,
       full_name: user.full_name,
+      position_name: user.position_name,
       role: user.role_name,
       is_active: user.is_active,
       created_at: user.created_at,
@@ -203,7 +204,7 @@ export async function getAllUsers(req, res) {
 
     const result = await request.query(`
       SELECT u.id, u.email, u.full_name, u.role_id, r.role_name,
-             u.is_active, u.created_at, u.updated_at
+             u.is_active, u.created_at, u.position_name, u.updated_at
       FROM users u
       JOIN roles r ON r.id = u.role_id
       ${where}
@@ -248,7 +249,7 @@ export async function getUserById(req, res) {
       .input("id", sql.Int, targetId)
       .query(
         `SELECT u.id, u.email, u.full_name, u.role_id, r.role_name,
-                u.is_active, u.created_at, u.updated_at
+                u.is_active, u.position_name, u.created_at, u.updated_at
          FROM users u JOIN roles r ON r.id = u.role_id
          WHERE u.id = @id`
       );
@@ -274,7 +275,7 @@ export async function getUserById(req, res) {
 
 // POST /users
 export async function createUser(req, res) {
-  const { email, password, full_name, role_id, lab_type_ids } = req.body;
+  const { email, password, full_name, role_id, lab_type_ids, position_name } = req.body;
 
   if (!email || !password || !full_name || !role_id) {
     return res.status(400).json({ message: "email, password, full_name, role_id шаардлагатай" });
@@ -323,9 +324,10 @@ export async function createUser(req, res) {
         .input("hash", sql.VarChar(255), hash)
         .input("fullName", sql.NVarChar(100), full_name)
         .input("roleId", sql.Int, role_id)
+        .input("position_name", sql.NVarChar(100), position_name)
         .query(
-          `INSERT INTO users (email, password_hash, full_name, role_id)
-           VALUES (@email, @hash, @fullName, @roleId);
+          `INSERT INTO users (email, password_hash, full_name, position_name, role_id)
+           VALUES (@email, @hash, @fullName, @position_name, @roleId);
            SELECT SCOPE_IDENTITY() AS id;`
         );
 

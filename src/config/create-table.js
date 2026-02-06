@@ -68,7 +68,7 @@ async function initDatabase() {
         lab_type_id INT FOREIGN KEY REFERENCES lab_types(id),
         report_id INT FOREIGN KEY REFERENCES reports(id),
         sample_name NVARCHAR(300) NOT NULL,
-        sample_amount VARCHAR(50),
+        sample_amount NVARCHAR(50),
         location NVARCHAR(200),
         sample_date DATE,
         sampled_by NVARCHAR(100),
@@ -176,7 +176,8 @@ async function initDatabase() {
     CREATE TABLE users (
     id INT IDENTITY(1,1) PRIMARY KEY,             -- ← Нэмэх (Дараа Keycloak-д) keycloak_id VARCHAR(100) UNIQUE, 
     email VARCHAR(100) NOT NULL UNIQUE,
-    password_hash VARCHAR(255),                    
+    password_hash VARCHAR(255),
+    position_name NVARCHAR(100),
     full_name NVARCHAR(100),
     role_id INT FOREIGN KEY REFERENCES roles(id),
     is_active BIT DEFAULT 1,

@@ -2,7 +2,7 @@ import sql from "mssql";
 import { getConnection } from "../../config/connection-db.js";
 
 // DELETE /location-packages/:id
-// Delete a location package (will cascade delete samples if FK is set up properly)
+// Soft delete a location package (set is_active = 0)
 export async function deleteLocationPackage(req, res) {
   try {
     const packageId = Number(req.params.id);
@@ -12,15 +12,15 @@ export async function deleteLocationPackage(req, res) {
 
     const pool = await getConnection();
 
-    // First delete associated samples
+    // First soft delete associated samples
     await pool.request()
       .input("packageId", sql.Int, packageId)
-      .query(`DELETE FROM location_samples WHERE location_package_id = @packageId`);
+      .query(`UPDATE location_samples SET is_active = 0 WHERE location_package_id = @packageId`);
 
-    // Then delete the package
+    // Then soft delete the package
     const result = await pool.request()
       .input("packageId", sql.Int, packageId)
-      .query(`DELETE FROM location_packages WHERE id = @packageId`);
+      .query(`UPDATE location_packages SET is_active = 0 WHERE id = @packageId`);
 
     if (result.rowsAffected[0] === 0) {
       return res.status(404).json({ error: "Package not found" });
@@ -34,7 +34,7 @@ export async function deleteLocationPackage(req, res) {
 }
 
 // DELETE /location-samples/:id
-// Delete a specific location sample
+// Soft delete a specific location sample (set is_active = 0)
 export async function deleteLocationSample(req, res) {
   try {
     const sampleId = Number(req.params.id);
@@ -45,7 +45,7 @@ export async function deleteLocationSample(req, res) {
     const pool = await getConnection();
     const result = await pool.request()
       .input("sampleId", sql.Int, sampleId)
-      .query(`DELETE FROM location_samples WHERE id = @sampleId`);
+      .query(`UPDATE location_samples SET is_active = 0 WHERE id = @sampleId`);
 
     if (result.rowsAffected[0] === 0) {
       return res.status(404).json({ error: "Location sample not found" });

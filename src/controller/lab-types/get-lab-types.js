@@ -5,7 +5,7 @@ export async function getLabTypes (req, res){
         const pool = await getConnection();
         // Return ALL lab types (both active and inactive) so frontend can show/manage them
         const result = await pool.request()
-        .query(`SELECT * FROM lab_types ORDER BY is_active DESC, type_name`);
+        .query(`SELECT * FROM lab_types ORDER BY is_active DESC, id`);
         res.json(result.recordset)
     }catch(err){
         console.log('error while getting lab_type', err)
