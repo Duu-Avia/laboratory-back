@@ -39,7 +39,6 @@ async function fetchReportRows(pool, reportId) {
     .query(`
       SELECT
         r.id AS report_id,
-        r.report_title,
         r.created_at,
         r.test_start_date,
         r.test_end_date,
@@ -133,7 +132,6 @@ function buildModel(rows, reportId) {
   const labDugaar = `${reportId}/${sampleEhniiDugaar}-${sampleSuuliinDugaar}`;
 
   return {
-    report_title: first.report_title ?? "",
     tailanDugaar,
     testedDate,
     sampled_date,

@@ -15,7 +15,6 @@ export async function generateExcel(req,res){
         .query(`
             SELECT  
             r.id,   
-            r.report_title,
             r.created_at,
             r.status,
             STUFF((SELECT DISTINCT ', ' + s2.sample_name
@@ -39,7 +38,7 @@ export async function generateExcel(req,res){
             JOIN lab_types st ON st.id = s.lab_type_id
             WHERE (r.status = @status OR r.status != 'deleted')
             GROUP BY
-            r.id, r.report_title, r.created_at, r.status, st.type_name, s.sampled_by
+            r.id, r.created_at, r.status, st.type_name, s.sampled_by
             ORDER BY r.created_at DESC;
             `)
             const rows = response.recordset
@@ -48,7 +47,6 @@ export async function generateExcel(req,res){
                 ws.columns = [
       { header: "Он сар", key: "created_at", width: 14 },
       { header: "Дугаар", key: "id", width: 10 },
-      { header: "Дээжны нэр", key: "report_title", width: 30 },
       { header: "Оруулсан дээжүүд", key: "sample_names", width: 40 },
       {header:"Сонгогдсон шинжилгээ", key:"indicator_names", width:40},
       { header: "Байршил", key: "location", width: 25 },
@@ -66,7 +64,6 @@ export async function generateExcel(req,res){
         for(const row of rows){
           const excelRow =  ws.addRow({
                 created_at: row.created_at,
-                report_title: row.report_title,
                 sample_names:row.sample_names ? row.sample_names.split(",").join("\n") : "",
                 indicator_names:row.indicator_names ? row.indicator_names.split(",").join("\n") : "",
                 location:row.location,

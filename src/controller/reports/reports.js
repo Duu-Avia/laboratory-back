@@ -3,7 +3,7 @@ import { getConnection } from "../../config/connection-db.js";
 
 
 export async function createReportWithSamples(req, res) {
-  const { report_title, test_start_date, test_end_date, approved_by, analyst, samples, status, assigned_to } = req.body;
+  const {  test_start_date, test_end_date, approved_by, analyst, samples, status, assigned_to } = req.body;
 
   if (!Array.isArray(samples) || samples.length === 0) {
     return res.status(400).json({ message: "samples is required and must be a non-empty array" });
@@ -20,16 +20,15 @@ export async function createReportWithSamples(req, res) {
     //  create report
     const reportReq = new sql.Request(tx);
     const reportInsert = await reportReq
-      .input("report_title", sql.NVarChar(200), report_title ?? null)
       .input("test_start_date", sql.Date, test_start_date ?? null)
       .input("approved_by", sql.NVarChar(100), approved_by ?? null)
       .input("analyst", sql.NVarChar(100), analyst ?? null)
       .input("assigned_to", sql.Int, assigned_to ?? null)
       .input("created_by", sql.Int, req.user.userId)
       .query(`
-        INSERT INTO reports (report_title, test_start_date, approved_by, analyst, assigned_to, created_by, status)
+        INSERT INTO reports ( test_start_date, approved_by, analyst, assigned_to, created_by, status)
         OUTPUT INSERTED.id
-        VALUES (@report_title, @test_start_date, @approved_by, @analyst, @assigned_to, @created_by, 'draft')
+        VALUES (@test_start_date, @approved_by, @analyst, @assigned_to, @created_by, 'draft')
       `);
 
     const reportId = reportInsert.recordset[0].id;
@@ -119,7 +118,6 @@ export async function listReports(req, res) {
       .query(`
         SELECT
           r.id,
-          r.report_title,
           r.test_start_date,
           r.test_end_date,
           r.analyst,
@@ -206,7 +204,7 @@ export async function listReports(req, res) {
           )
 
         GROUP BY
-          r.id, r.report_title, r.test_start_date, r.test_end_date,
+          r.id,  r.test_start_date, r.test_end_date,
           r.analyst, r.status, r.created_at, r.created_by, u_creator.full_name,
           r.assigned_to, u_assigned.full_name, lt.type_name
 
@@ -233,7 +231,6 @@ export async function getReportDetail(req, res) {
       .query(`
         SELECT
           r.id AS report_id,
-          r.report_title,
           r.test_start_date,
           r.test_end_date,
           r.approved_by,
@@ -289,7 +286,6 @@ export async function getReportDetail(req, res) {
     const first = rows[0];
     const report = {
       id: first.report_id,
-      report_title: first.report_title,
       test_start_date: first.test_start_date,
       test_end_date: first.test_end_date,
       approved_by: first.approved_by,
@@ -510,7 +506,7 @@ export async function sofDeleteReport(req, res) {
 
 export async function updateReport(req, res) {
   const reportId = Number(req.params.id);
-  const { report_title, samples } = req.body;
+  const { samples } = req.body;
 
   console.log("=== UPDATE REPORT ===");
   console.log("reportId:", reportId);
@@ -539,14 +535,6 @@ export async function updateReport(req, res) {
     }
 
     await tx.begin(sql.ISOLATION_LEVEL.READ_COMMITTED);
-
-    // 1) Update report title
-    if (typeof report_title === "string") {
-      await new sql.Request(tx)
-        .input("reportId", sql.Int, reportId)
-        .input("title", sql.NVarChar(200), report_title)
-        .query(`UPDATE reports SET report_title = @title WHERE id = @reportId`);
-    }
 
     // 2) Soft-delete samples that were removed from the list
     const existingSamples = await new sql.Request(tx)
@@ -765,7 +753,6 @@ export async function archiveReport(req, res) {
       .query(`
         SELECT
           r.id,
-          r.report_title,
           r.approved_by,
           r.analyst,
           r.status,
@@ -829,7 +816,7 @@ export async function archiveReport(req, res) {
           )
 
         GROUP BY
-          r.id, r.report_title, r.approved_by, r.analyst, r.status,
+          r.id, r.approved_by, r.analyst, r.status,
           r.created_at, r.updated_at, r.test_start_date, r.test_end_date,
           lt.type_name
 

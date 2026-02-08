@@ -43,7 +43,6 @@ async function initDatabase() {
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='reports' AND xtype='U')
       CREATE TABLE reports (
         id INT IDENTITY(1,1) PRIMARY KEY,
-        report_title NVARCHAR(200),
         test_start_date DATE,
         test_end_date DATE,
         analyst NVARCHAR(100),
