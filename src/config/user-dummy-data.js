@@ -76,7 +76,7 @@ async function seedUserData() {
       INSERT INTO role_permissions (role_id, permission_id)
       SELECT 3, id FROM permissions 
       WHERE permission_key IN (
-      'report:create', 'report:read', 'report:update',
+      'report:create', 'report:read', 'report:update', 'report:delete',
       'result:create', 'result:read', 'result:update',
       'export:pdf', 'export:excel'
     )
