@@ -3,7 +3,7 @@ import { getConnection } from "../../config/connection-db.js";
 
 
 export async function createReportWithSamples(req, res) {
-  const {  test_start_date, test_end_date, approved_by, analyst, samples, status, assigned_to } = req.body;
+  const {  test_start_date, test_end_date, approved_by, analyst, samples, status } = req.body;
 
   if (!Array.isArray(samples) || samples.length === 0) {
     return res.status(400).json({ message: "samples is required and must be a non-empty array" });
@@ -23,12 +23,11 @@ export async function createReportWithSamples(req, res) {
       .input("test_start_date", sql.Date, test_start_date ?? null)
       .input("approved_by", sql.NVarChar(100), approved_by ?? null)
       .input("analyst", sql.NVarChar(100), analyst ?? null)
-      .input("assigned_to", sql.Int, assigned_to ?? null)
       .input("created_by", sql.Int, req.user.userId)
       .query(`
-        INSERT INTO reports ( test_start_date, approved_by, analyst, assigned_to, created_by, status)
+        INSERT INTO reports ( test_start_date, approved_by, analyst, created_by, status)
         OUTPUT INSERTED.id
-        VALUES (@test_start_date, @approved_by, @analyst, @assigned_to, @created_by, 'draft')
+        VALUES (@test_start_date, @approved_by, @analyst, @created_by, 'draft')
       `);
 
     const reportId = reportInsert.recordset[0].id;

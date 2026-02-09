@@ -3,18 +3,21 @@ import { getConnection } from "../../config/connection-db.js";
 
 /**
  * PUT /reports/sign/:id
- * Body: { password }
+ * Body: { password, assigned_to }
  * Engineer signs the report after entering all test results.
  */
 export async function signReport(req, res) {
   const reportId = Number(req.params.id);
-  const { password } = req.body;
+  const { password, assigned_to } = req.body;
 
   if (!reportId) {
     return res.status(400).json({ message: "Invalid report id" });
   }
   if (!password) {
     return res.status(400).json({ message: "Нууц үг шаардлагатай" });
+  }
+  if (!assigned_to) {
+    return res.status(400).json({ message: "Хянах инженер сонгоно уу" });
   }
 
   try {
@@ -63,15 +66,17 @@ export async function signReport(req, res) {
       });
     }
 
-    // 3) Sign the report
+    // 3) Sign the report and assign senior engineer
     await pool.request()
       .input("reportId", sql.Int, reportId)
       .input("signedBy", sql.NVarChar(100), user.full_name)
+      .input("assignedTo", sql.Int, assigned_to)
       .query(`
         UPDATE reports
         SET status = 'signed',
             signed_by = @signedBy,
             signed_at = GETDATE(),
+            assigned_to = @assignedTo,
             updated_at = GETDATE()
         WHERE id = @reportId
       `);
