@@ -27,6 +27,13 @@ function cellText(row) {
   if (row.is_detected === true) return "Илэрсэн";
   if (row.is_detected === false) return "Илрээгүй";
   if (row.result_value !== null && row.result_value !== undefined && String(row.result_value).trim() !== "") {
+    // CFU results are stored as JSON with temp22/temp37/average – show only the average
+    try {
+      const parsed = JSON.parse(row.result_value);
+      if (parsed && typeof parsed === "object" && parsed.average !== undefined) {
+        return String(parsed.average);
+      }
+    } catch {}
     return String(row.result_value);
   }
   return "";

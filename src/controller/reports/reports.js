@@ -379,7 +379,7 @@ export async function saveReportResultsBulk(req, res) {
       await reqTx
         .input("reportId", sql.Int, reportId)
         .input("sample_indicator_id", sql.Int, Number(item.sample_indicator_id))
-        .input("result_value", sql.VarChar(100), item.result_value ? item.avg : null)
+        .input("result_value", sql.VarChar(100), item.result_value ?? null)
         .input("is_detected", sql.Bit, item.is_detected ?? null)
         .input("is_within_limit", sql.Bit, item.is_within_limit ?? null)
         .input("equipment_id", sql.NVarChar(100), item.equipment_id ?? null)
