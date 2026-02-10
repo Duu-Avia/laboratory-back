@@ -218,6 +218,20 @@ async function initDatabase() {
       WHERE r.created_by IS NULL AND r.analyst IS NOT NULL
     `);
 
+    // Report Comments (rejection feedback, resubmission notes)
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='report_comments' AND xtype='U')
+      CREATE TABLE report_comments (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        report_id INT NOT NULL FOREIGN KEY REFERENCES reports(id),
+        user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
+        comment NVARCHAR(MAX) NOT NULL,
+        action_type VARCHAR(20) NOT NULL,
+        created_at DATETIME DEFAULT GETDATE()
+      )
+    `);
+    console.log("✅ report_comments table created");
+
     console.log("✅  tables created");
   } catch (error) {
     console.log("❌ Failed while creating tables", error);

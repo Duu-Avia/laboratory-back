@@ -2,13 +2,13 @@ import sql from "mssql";
 import { getConnection } from "../../config/connection-db.js";
 
 /**
- * PUT /reports/sign/:id
- * Body: { password, assigned_to }
- * Engineer signs the report after entering all test results.
+ * PUT /reports/reject/:id
+ * Body: { password, comment }
+ * Senior engineer rejects a signed report with a comment.
  */
-export async function signReport(req, res) {
+export async function rejectReport(req, res) {
   const reportId = Number(req.params.id);
-  const { password, assigned_to } = req.body;
+  const { password, comment } = req.body;
 
   if (!reportId) {
     return res.status(400).json({ message: "Invalid report id" });
@@ -16,14 +16,14 @@ export async function signReport(req, res) {
   if (!password) {
     return res.status(400).json({ message: "Нууц үг шаардлагатай" });
   }
-  if (!assigned_to) {
-    return res.status(400).json({ message: "Хянах инженер сонгоно уу" });
+  if (!comment || !comment.trim()) {
+    return res.status(400).json({ message: "Буцаах шалтгаан бичнэ үү" });
   }
 
   try {
     const pool = await getConnection();
 
-    // 1) Verify password against the logged-in user
+    // 1) Verify password
     const userResult = await pool.request()
       .input("userId", sql.Int, req.user.userId)
       .query(`
@@ -37,59 +37,64 @@ export async function signReport(req, res) {
       return res.status(401).json({ message: "Хэрэглэгч олдсонгүй" });
     }
 
-    // Plain text comparison (same as login - TODO: bcrypt in production)
     const isValid = user.password_hash === password;
     if (!isValid) {
       return res.status(401).json({ message: "Нууц үг буруу" });
     }
 
-    // 2) Check report exists and is in 'tested' status
+    // 2) Check report exists and is in 'signed' status
     const reportResult = await pool.request()
       .input("reportId", sql.Int, reportId)
-      .query(`SELECT id, status, created_by FROM reports WHERE id = @reportId`);
+      .query(`SELECT id, status, assigned_to FROM reports WHERE id = @reportId`);
 
     const report = reportResult.recordset[0];
     if (!report) {
       return res.status(404).json({ message: "Тайлан олдсонгүй" });
     }
-    if (report.status !== "tested" && report.status !== "rejected") {
+    if (report.status !== "signed") {
       return res.status(400).json({
-        message: "Зөвхөн шинжилгээ дууссан эсвэл буцаагдсан тайланд гарын үсэг зурах боломжтой",
+        message: "Зөвхөн гарын үсэг зурсан тайланг буцаах боломжтой",
         current_status: report.status,
       });
     }
 
-    // Only the report creator can sign
-    if (report.created_by !== req.user.userId) {
+    // 3) Only the assigned senior (or superadmin) can reject
+    if (req.user.roleName !== "superadmin" && report.assigned_to !== req.user.userId) {
       return res.status(403).json({
-        message: "Зөвхөн тайлан үүсгэсэн инженер гарын үсэг зурах боломжтой",
+        message: "Зөвхөн хариуцсан ахлах инженер тайланг буцаах боломжтой",
       });
     }
 
-    // 3) Sign the report and assign senior engineer
+    // 4) Update status to rejected
     await pool.request()
       .input("reportId", sql.Int, reportId)
-      .input("signedBy", sql.NVarChar(100), user.full_name)
-      .input("assignedTo", sql.Int, assigned_to)
       .query(`
         UPDATE reports
-        SET status = 'signed',
-            signed_by = @signedBy,
-            signed_at = GETDATE(),
-            assigned_to = @assignedTo,
+        SET status = 'rejected',
             updated_at = GETDATE()
         WHERE id = @reportId
       `);
 
+    // 5) Insert rejection comment
+    await pool.request()
+      .input("reportId", sql.Int, reportId)
+      .input("userId", sql.Int, req.user.userId)
+      .input("comment", sql.NVarChar(sql.MAX), comment.trim())
+      .input("actionType", sql.VarChar(20), "rejected")
+      .query(`
+        INSERT INTO report_comments (report_id, user_id, comment, action_type)
+        VALUES (@reportId, @userId, @comment, @actionType)
+      `);
+
     return res.json({
-      message: "Тайланд амжилттай гарын үсэг зурлаа",
+      message: "Тайлан амжилттай буцаагдлаа",
       report_id: reportId,
-      signed_by: user.full_name,
+      rejected_by: user.full_name,
     });
   } catch (err) {
-    console.error("Sign error:", err);
+    console.error("Reject error:", err);
     return res.status(500).json({
-      message: "Гарын үсэг зурахад алдаа гарлаа",
+      message: "Тайлан буцаахад алдаа гарлаа",
       error: String(err.message ?? err),
     });
   }

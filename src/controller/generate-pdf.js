@@ -208,7 +208,7 @@ function buildSampleColumns(sampleCount) {
 function drawFixedHeader(page, model, font) {
   const black = rgb(0, 0, 0);
 
-  page.drawText(`Тус бүр ${model.sample_amount}л`, { x: LAYOUT.x_amount, y: LAYOUT.y_amount, size: 9, font, color: black });
+  page.drawText(`Тус бүр ${model.sample_amount}`, { x: LAYOUT.x_amount, y: LAYOUT.y_amount, size: 9, font, color: black });
   page.drawText(model.testedDate, { x: LAYOUT.x_tested, y: LAYOUT.y_tested, size: 9, font, color: black });
   page.drawText(model.sampled_date, { x: LAYOUT.x_sampledDate, y: LAYOUT.y_sampledDate, size: 9, font, color: black });
   page.drawText(String(model.tailanDugaar), { x: LAYOUT.x_tailan, y: LAYOUT.y_tailan, size: 9, font, color: black });

@@ -338,9 +338,26 @@ export async function getReportDetail(req, res) {
       });
     }
 
+    // Fetch report comments (rejections, resubmissions)
+    const commentsResult = await pool.request()
+      .input("reportId2", sql.Int, reportId)
+      .query(`
+        SELECT
+          rc.id,
+          rc.comment,
+          rc.action_type,
+          rc.created_at,
+          u.full_name AS user_name
+        FROM report_comments rc
+        JOIN users u ON u.id = rc.user_id
+        WHERE rc.report_id = @reportId2
+        ORDER BY rc.created_at DESC
+      `);
+
     return res.json({
       report,
       samples: Array.from(sampleMap.values()),
+      comments: commentsResult.recordset,
     });
   } catch (err) {
     res.status(500).json({
@@ -590,12 +607,14 @@ export async function updateReport(req, res) {
           .input("lab_type_id", sql.Int, s.lab_type_id)
           .input("sample_name", sql.NVarChar(200), s.sample_name)
           .input("sample_date", sql.Date, s.sample_date || null)
+          .input("sample_amount", sql.NVarChar(100), s.sample_amount)
           .input("location", sql.NVarChar(200), s.location ?? "")
           .input("sampled_by", sql.NVarChar(100), s.sampled_by ?? "")
           .query(`
             UPDATE samples
             SET lab_type_id = @lab_type_id,
                 sample_name = @sample_name,
+                sample_amount = @sample_amount,
                 sample_date = @sample_date,
                 location = @location,
                 sampled_by = @sampled_by,
