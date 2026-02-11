@@ -1,5 +1,7 @@
 import sql from "mssql";
 import { getConnection } from "../../config/connection-db.js";
+import { createNotification } from "../notifications/notification-service.js";
+import { NOTIFICATION_TYPE } from "../../constants/index.js";
 
 /**
  * PUT /reports/reject/:id
@@ -45,7 +47,7 @@ export async function rejectReport(req, res) {
     // 2) Check report exists and is in 'signed' status
     const reportResult = await pool.request()
       .input("reportId", sql.Int, reportId)
-      .query(`SELECT id, status, assigned_to FROM reports WHERE id = @reportId`);
+      .query(`SELECT id, status, assigned_to, created_by FROM reports WHERE id = @reportId`);
 
     const report = reportResult.recordset[0];
     if (!report) {
@@ -85,6 +87,17 @@ export async function rejectReport(req, res) {
         INSERT INTO report_comments (report_id, user_id, comment, action_type)
         VALUES (@reportId, @userId, @comment, @actionType)
       `);
+
+    // 6) Notify the engineer who created the report
+    if (report.created_by) {
+      await createNotification({
+        recipientId: report.created_by,
+        senderId: req.user.userId,
+        type: NOTIFICATION_TYPE.REPORT_REJECTED,
+        message: `таны ${reportId} дугаартай сорьцын тайлан цуцлагдсан байна`,
+        reportId: reportId,
+      });
+    }
 
     return res.json({
       message: "Тайлан амжилттай буцаагдлаа",

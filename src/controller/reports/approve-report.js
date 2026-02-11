@@ -1,5 +1,7 @@
 import sql from "mssql";
 import { getConnection } from "../../config/connection-db.js";
+import { createNotification } from "../notifications/notification-service.js";
+import { NOTIFICATION_TYPE } from "../../constants/index.js";
 
 /**
  * PUT /reports/approve/:id
@@ -43,7 +45,7 @@ export async function approveReport(req, res) {
     // 2) Check report exists and is in 'tested' status
     const reportResult = await pool.request()
       .input("reportId", sql.Int, reportId)
-      .query(`SELECT id, status, assigned_to FROM reports WHERE id = @reportId`);
+      .query(`SELECT id, status, assigned_to, created_by FROM reports WHERE id = @reportId`);
 
     const report = reportResult.recordset[0];
     if (!report) {
@@ -75,6 +77,17 @@ export async function approveReport(req, res) {
             updated_at = GETDATE()
         WHERE id = @reportId
       `);
+
+    // 4) Notify the engineer who created the report
+    if (report.created_by) {
+      await createNotification({
+        recipientId: report.created_by,
+        senderId: req.user.userId,
+        type: NOTIFICATION_TYPE.REPORT_APPROVED,
+        message: `таны ${reportId} дугаартай сорьцын тайлан батлагдсан байна`,
+        reportId: reportId,
+      });
+    }
 
     return res.json({
       message: "Тайлан амжилттай батлагдлаа",

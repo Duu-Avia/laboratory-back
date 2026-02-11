@@ -232,6 +232,29 @@ async function initDatabase() {
     `);
     console.log("✅ report_comments table created");
 
+    // Notifications table
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='notifications' AND xtype='U')
+      CREATE TABLE notifications (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        recipient_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
+        sender_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
+        type VARCHAR(50) NOT NULL,
+        message NVARCHAR(500) NOT NULL,
+        report_id INT NULL,
+        is_read BIT DEFAULT 0,
+        created_at DATETIME DEFAULT GETDATE()
+      )
+    `);
+
+    // Index for fast recipient queries
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_notifications_recipient_read')
+        CREATE INDEX IX_notifications_recipient_read
+        ON notifications (recipient_id, is_read, created_at DESC)
+    `);
+    console.log("✅ notifications table created");
+
     console.log("✅  tables created");
   } catch (error) {
     console.log("❌ Failed while creating tables", error);

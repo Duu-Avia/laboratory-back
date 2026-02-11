@@ -77,6 +77,15 @@ export const DATE_FORMATS = {
   DATETIME: 'YYYY-MM-DD HH:mm:ss',
 };
 
+/**
+ * Notification types
+ */
+export const NOTIFICATION_TYPE = {
+  REPORT_ASSIGNED: 'report_assigned',
+  REPORT_APPROVED: 'report_approved',
+  REPORT_REJECTED: 'report_rejected',
+};
+
 export default {
   REPORT_STATUS,
   SAMPLE_STATUS,
@@ -85,4 +94,5 @@ export default {
   HTTP_STATUS,
   PAGINATION,
   DATE_FORMATS,
+  NOTIFICATION_TYPE,
 };

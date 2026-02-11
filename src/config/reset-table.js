@@ -12,11 +12,11 @@ const resetTables = async () => {
         
         await pool.request().query(`IF OBJECT_ID('samples', 'U') IS NOT NULL DROP TABLE samples`);
         console.log("✅ samples table dropped");
-        
+       
+        await pool.request().query(`IF OBJECT_ID('report_comments', 'U') IS NOT NULL DROP TABLE report_comments`)
+
         await pool.request().query(`IF OBJECT_ID('reports', 'U') IS NOT NULL DROP TABLE reports`);
         console.log("✅ reports table dropped");
-        
-        
         
         await pool.request().query(`IF OBJECT_ID('indicators', 'U') IS NOT NULL DROP TABLE indicators`);
         console.log("✅ indicators table dropped");

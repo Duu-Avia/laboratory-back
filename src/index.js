@@ -18,6 +18,9 @@ import usersRouter from './router/users.js';
 import { authMiddleware } from './middleware/auth-middleware.js';
 import resultsRouter from './router/results.js';
 import labTypeRouter from './router/lab-types.js';
+import notificationsRouter, { sseStreamHandler } from './router/notifications.js';
+import { startHeartbeat } from './controller/notifications/sse-manager.js';
+import { cleanOldNotifications } from './controller/notifications/notification-service.js';
 
 // Initialize Express app
 const app = express();
@@ -90,7 +93,12 @@ app.get('/', (req, res) => {
 
 //Auth routes
 app.use('/auth',routerExample);
+
+// SSE stream endpoint (needs query param auth since EventSource can't send headers)
+app.get('/notifications/stream', sseStreamHandler);
+
 // Mount routers
+app.use('/notifications', authMiddleware, notificationsRouter);
 app.use('/reports', authMiddleware, reportsRouter);
 app.use('/lab-types',authMiddleware, labTypeRouter);
 app.use('/indicators',authMiddleware, indicatorsRouter);
@@ -130,6 +138,16 @@ async function startServer() {
         environment: config.env,
         nodeVersion: process.version,
       });
+
+      // Start SSE heartbeat for notification connections
+      const heartbeatInterval = startHeartbeat();
+
+      // Clean old notifications on startup + every 24h
+      cleanOldNotifications();
+      const cleanupInterval = setInterval(cleanOldNotifications, 24 * 60 * 60 * 1000);
+
+      process.on('SIGTERM', () => { clearInterval(heartbeatInterval); clearInterval(cleanupInterval); });
+      process.on('SIGINT', () => { clearInterval(heartbeatInterval); clearInterval(cleanupInterval); });
 
       // Log available routes in development
       if (config.isDevelopment) {

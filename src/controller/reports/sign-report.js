@@ -1,5 +1,7 @@
 import sql from "mssql";
 import { getConnection } from "../../config/connection-db.js";
+import { createNotification } from "../notifications/notification-service.js";
+import { NOTIFICATION_TYPE } from "../../constants/index.js";
 
 /**
  * PUT /reports/sign/:id
@@ -80,6 +82,15 @@ export async function signReport(req, res) {
             updated_at = GETDATE()
         WHERE id = @reportId
       `);
+
+    // 4) Notify the assigned senior engineer
+    await createNotification({
+      recipientId: assigned_to,
+      senderId: req.user.userId,
+      type: NOTIFICATION_TYPE.REPORT_ASSIGNED,
+      message: `Таньд ${user.full_name} -с ${reportId} дугаартай тайлан хянах хүсэлт ирсэн байна`,
+      reportId: reportId,
+    });
 
     return res.json({
       message: "Тайланд амжилттай гарын үсэг зурлаа",
