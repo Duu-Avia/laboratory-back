@@ -364,7 +364,7 @@ export async function getReportDetail(req, res) {
 
 export async function saveReportResultsBulk(req, res) {
   const reportId = Number(req.params.id);
-  const { results } = req.body;
+  const { results, is_complete } = req.body;
   if (!reportId) return res.status(400).json({ message: "Invalid report id" });
   if (!Array.isArray(results) || results.length === 0) {
     return res.status(400).json({ message: "results must be a non-empty array" });
@@ -429,34 +429,28 @@ export async function saveReportResultsBulk(req, res) {
           END
         `);
     }
-    // AFTER saving all test_results, update report status (better rule)
-  await new sql.Request(tx)
-  .input("reportId", sql.Int, reportId)
-  .query(`
-    -- If any indicator under this report has NO result yet → still pending
-    IF EXISTS (
-      SELECT 1
-      FROM sample_indicators si
-      JOIN samples s ON s.id = si.sample_id
-      LEFT JOIN test_results tr ON tr.sample_indicator_id = si.id
-      WHERE s.report_id = @reportId
-        AND tr.id IS NULL
-    )
-    BEGIN
-      UPDATE reports
-        SET status = 'pending_samples',
-            updated_at = GETDATE()
-      WHERE id = @reportId;
-    END
-    ELSE
-    BEGIN
-      UPDATE reports
-        SET status = 'tested',
-            test_end_date = CAST(GETDATE() AS date),
-            updated_at = GETDATE()
-      WHERE id = @reportId;
-    END
-  `);
+    // Update report status based on frontend completeness check
+    const newStatus = is_complete ? 'tested' : 'incomplete';
+    const statusReq = new sql.Request(tx);
+    statusReq.input("reportId", sql.Int, reportId);
+    statusReq.input("newStatus", sql.VarChar(50), newStatus);
+
+    if (is_complete) {
+      await statusReq.query(`
+        UPDATE reports
+          SET status = @newStatus,
+              test_end_date = CAST(GETDATE() AS date),
+              updated_at = GETDATE()
+        WHERE id = @reportId
+      `);
+    } else {
+      await statusReq.query(`
+        UPDATE reports
+          SET status = @newStatus,
+              updated_at = GETDATE()
+        WHERE id = @reportId
+      `);
+    }
 
 
     await tx.commit();
