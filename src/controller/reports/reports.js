@@ -3,7 +3,7 @@ import { getConnection } from "../../config/connection-db.js";
 
 
 export async function createReportWithSamples(req, res) {
-  const {  test_start_date, test_end_date, approved_by, analyst, samples, status } = req.body;
+  const {  test_start_date, samples } = req.body;
 
   if (!Array.isArray(samples) || samples.length === 0) {
     return res.status(400).json({ message: "samples is required and must be a non-empty array" });
@@ -21,13 +21,11 @@ export async function createReportWithSamples(req, res) {
     const reportReq = new sql.Request(tx);
     const reportInsert = await reportReq
       .input("test_start_date", sql.Date, test_start_date ?? null)
-      .input("approved_by", sql.NVarChar(100), approved_by ?? null)
-      .input("analyst", sql.NVarChar(100), analyst ?? null)
       .input("created_by", sql.Int, req.user.userId)
       .query(`
-        INSERT INTO reports ( test_start_date, approved_by, analyst, created_by, status)
+        INSERT INTO reports (test_start_date, created_by, status)
         OUTPUT INSERTED.id
-        VALUES (@test_start_date, @approved_by, @analyst, @created_by, 'draft')
+        VALUES (@test_start_date, @created_by, 'draft')
       `);
 
     const reportId = reportInsert.recordset[0].id;
@@ -67,10 +65,9 @@ export async function createReportWithSamples(req, res) {
         await siReq
           .input("sample_id", sql.Int, sampleId)
           .input("indicator_id", sql.Int, indicatorId)
-          .input("analyst", sql.NVarChar(100), analyst ?? null)
           .query(`
-            INSERT INTO sample_indicators (sample_id, indicator_id, analyst)
-            VALUES (@sample_id, @indicator_id, @analyst)
+            INSERT INTO sample_indicators (sample_id, indicator_id)
+            VALUES (@sample_id, @indicator_id)
           `);
       }
 
@@ -119,7 +116,6 @@ export async function listReports(req, res) {
           r.id,
           r.test_start_date,
           r.test_end_date,
-          r.analyst,
           r.status,
           r.created_at,
           r.created_by,
@@ -204,7 +200,7 @@ export async function listReports(req, res) {
 
         GROUP BY
           r.id,  r.test_start_date, r.test_end_date,
-          r.analyst, r.status, r.created_at, r.created_by, u_creator.full_name,
+          r.status, r.created_at, r.created_by, u_creator.full_name,
           r.assigned_to, u_assigned.full_name, lt.type_name
 
         ORDER BY r.created_at DESC;
@@ -232,8 +228,6 @@ export async function getReportDetail(req, res) {
           r.id AS report_id,
           r.test_start_date,
           r.test_end_date,
-          r.approved_by,
-          r.analyst,
           r.status AS report_status,
           r.created_by,
           r.assigned_to,
@@ -287,8 +281,6 @@ export async function getReportDetail(req, res) {
       id: first.report_id,
       test_start_date: first.test_start_date,
       test_end_date: first.test_end_date,
-      approved_by: first.approved_by,
-      analyst: first.analyst,
       status: first.report_status,
       created_by: first.created_by,
       assigned_to: first.assigned_to,
@@ -771,8 +763,6 @@ export async function archiveReport(req, res) {
       .query(`
         SELECT
           r.id,
-          r.approved_by,
-          r.analyst,
           r.status,
           r.created_at,
           r.updated_at,
@@ -834,7 +824,7 @@ export async function archiveReport(req, res) {
           )
 
         GROUP BY
-          r.id, r.approved_by, r.analyst, r.status,
+          r.id, r.status,
           r.created_at, r.updated_at, r.test_start_date, r.test_end_date,
           lt.type_name
 

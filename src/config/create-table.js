@@ -45,7 +45,6 @@ async function initDatabase() {
         id INT IDENTITY(1,1) PRIMARY KEY,
         test_start_date DATE,
         test_end_date DATE,
-        analyst NVARCHAR(100),
         status VARCHAR(50) DEFAULT 'draft',
         assigned_to INT NULL,
         created_by INT NULL,
@@ -85,8 +84,6 @@ async function initDatabase() {
         id INT IDENTITY(1,1) PRIMARY KEY,
         sample_id INT FOREIGN KEY REFERENCES samples(id) ON DELETE CASCADE,
         indicator_id INT FOREIGN KEY REFERENCES indicators(id),
-        analyst NVARCHAR(100),
-        test_date DATE,
         status VARCHAR(50) DEFAULT 'pending',
         created_at DATETIME DEFAULT GETDATE(),
         updated_at DATETIME DEFAULT GETDATE()
@@ -207,15 +204,6 @@ async function initDatabase() {
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('reports') AND name = 'created_by')
         ALTER TABLE reports ADD created_by INT NULL;
-    `);
-
-    // Backfill created_by from analyst name for existing reports
-    await pool.request().query(`
-      UPDATE r
-      SET r.created_by = u.id
-      FROM reports r
-      JOIN users u ON u.full_name = r.analyst
-      WHERE r.created_by IS NULL AND r.analyst IS NOT NULL
     `);
 
     // Report Comments (rejection feedback, resubmission notes)

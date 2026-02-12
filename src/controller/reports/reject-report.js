@@ -1,4 +1,5 @@
 import sql from "mssql";
+import bcrypt from "bcryptjs";
 import { getConnection } from "../../config/connection-db.js";
 import { createNotification } from "../notifications/notification-service.js";
 import { NOTIFICATION_TYPE } from "../../constants/index.js";
@@ -39,7 +40,12 @@ export async function rejectReport(req, res) {
       return res.status(401).json({ message: "Хэрэглэгч олдсонгүй" });
     }
 
-    const isValid = user.password_hash === password;
+    let isValid;
+    if (user.password_hash.startsWith("$2")) {
+      isValid = await bcrypt.compare(password, user.password_hash);
+    } else {
+      isValid = user.password_hash === password;
+    }
     if (!isValid) {
       return res.status(401).json({ message: "Нууц үг буруу" });
     }
