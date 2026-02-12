@@ -116,7 +116,7 @@ async function initDatabase() {
       package_name NVARCHAR(200) NOT NULL,
       lab_type_id INT FOREIGN KEY REFERENCES lab_types(id),
       is_active BIT DEFAULT 1,
-      created_at DATETIME DEFAULT GETDATE(),
+      created_at DATETIME DEFAULT GETDATE()
       )
       `);
     console.log("✅ location_packages table created")
