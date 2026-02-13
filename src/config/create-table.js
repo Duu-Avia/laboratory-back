@@ -177,6 +177,7 @@ async function initDatabase() {
     full_name NVARCHAR(100),
     role_id INT FOREIGN KEY REFERENCES roles(id),
     is_active BIT DEFAULT 1,
+    last_login DATETIME2 NULL,
     created_at DATETIME DEFAULT GETDATE(),
     updated_at DATETIME DEFAULT GETDATE()
   )
@@ -242,6 +243,23 @@ async function initDatabase() {
         ON notifications (recipient_id, is_read, created_at DESC)
     `);
     console.log("✅ notifications table created");
+
+
+    // logs table
+    await pool.request().query(`
+     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='activity_logs' AND xtype='U') 
+     CREATE TABLE activity_logs (
+     id INT IDENTITY(1,1) PRIMARY KEY,
+     user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
+     action VARCHAR(50),
+     target_type VARCHAR(50),
+     target_id INT NULL,
+     method VARCHAR(50),
+     path VARCHAR(50),
+     status_code INT,
+     created_at DATETIME DEFAULT GETDATE()
+     ) 
+     `)
 
     console.log("✅  tables created");
   } catch (error) {

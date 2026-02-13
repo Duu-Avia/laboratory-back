@@ -429,27 +429,29 @@ export async function saveReportResultsBulk(req, res) {
           END
         `);
     }
-    // Update report status based on frontend completeness check
-    const newStatus = is_complete ? 'tested' : 'incomplete';
-    const statusReq = new sql.Request(tx);
-    statusReq.input("reportId", sql.Int, reportId);
-    statusReq.input("newStatus", sql.VarChar(50), newStatus);
+    // Update report status only when frontend explicitly sends is_complete
+    if (is_complete !== undefined) {
+      const newStatus = is_complete ? 'tested' : 'incomplete';
+      const statusReq = new sql.Request(tx);
+      statusReq.input("reportId", sql.Int, reportId);
+      statusReq.input("newStatus", sql.VarChar(50), newStatus);
 
-    if (is_complete) {
-      await statusReq.query(`
-        UPDATE reports
-          SET status = @newStatus,
-              test_end_date = CAST(GETDATE() AS date),
-              updated_at = GETDATE()
-        WHERE id = @reportId
-      `);
-    } else {
-      await statusReq.query(`
-        UPDATE reports
-          SET status = @newStatus,
-              updated_at = GETDATE()
-        WHERE id = @reportId
-      `);
+      if (is_complete) {
+        await statusReq.query(`
+          UPDATE reports
+            SET status = @newStatus,
+                test_end_date = CAST(GETDATE() AS date),
+                updated_at = GETDATE()
+          WHERE id = @reportId
+        `);
+      } else {
+        await statusReq.query(`
+          UPDATE reports
+            SET status = @newStatus,
+                updated_at = GETDATE()
+          WHERE id = @reportId
+        `);
+      }
     }
 
 
@@ -510,10 +512,6 @@ export async function updateReport(req, res) {
   const reportId = Number(req.params.id);
   const { samples } = req.body;
 
-  console.log("=== UPDATE REPORT ===");
-  console.log("reportId:", reportId);
-  console.log("samples received:", samples.map(s => ({ sample_id: s.sample_id, sample_name: s.sample_name, indicators: s.indicators?.length })));
-
   if (!reportId) return res.status(400).json({ message: "Invalid reportId" });
   if (!Array.isArray(samples)) return res.status(400).json({ message: "samples must be array" });
 
@@ -546,15 +544,9 @@ export async function updateReport(req, res) {
     const existingIds = existingSamples.recordset.map((r) => Number(r.id));
     const incomingIds = samples.map((s) => s.sample_id).filter((id) => id != null).map(id => Number(id));
     
-    console.log("existingIds in DB:", existingIds);
-    console.log("incomingIds from frontend:", incomingIds);
-    
     const idsToDelete = existingIds.filter((id) => !incomingIds.includes(id));
-    
-    console.log("sample idsToDelete:", idsToDelete);
 
     for (const id of idsToDelete) {
-      console.log("Soft-deleting sample id:", id);
       await new sql.Request(tx)
         .input("sampleId", sql.Int, id)
         .query(`UPDATE samples SET status = 'deleted' WHERE id = @sampleId`);
@@ -583,10 +575,7 @@ export async function updateReport(req, res) {
             VALUES (@reportId, @lab_type_id, @sample_name, @sample_date, @location, @sampled_by, 'pending')
           `);
         sampleId = inserted.recordset[0].id;
-        console.log("Inserted new sample with id:", sampleId);
       } else {
-        // UPDATE existing sample
-        console.log("Updating sample id:", sampleId);
         await new sql.Request(tx)
           .input("reportId", sql.Int, reportId)
           .input("sampleId", sql.Int, sampleId)
@@ -626,10 +615,6 @@ export async function updateReport(req, res) {
       const existingIndicatorIds = existingIndicators.recordset.map(r => Number(r.indicator_id));
       const indicatorIdsToDelete = existingIndicatorIds.filter(id => !incomingIndicatorIds.includes(id));
 
-      console.log(`Sample ${sampleId} - existing indicators:`, existingIndicatorIds);
-      console.log(`Sample ${sampleId} - incoming indicators:`, incomingIndicatorIds);
-      console.log(`Sample ${sampleId} - indicators to delete:`, indicatorIdsToDelete);
-
       for (const indicatorId of indicatorIdsToDelete) {
         await new sql.Request(tx)
           .input("sampleId", sql.Int, sampleId)
@@ -639,7 +624,6 @@ export async function updateReport(req, res) {
             SET status = 'deleted' 
             WHERE sample_id = @sampleId AND indicator_id = @indicatorId
           `);
-        console.log(`Soft-deleted indicator ${indicatorId} for sample ${sampleId}`);
       }
 
       // 5) Process indicators for this sample (add new ones)
@@ -667,7 +651,6 @@ export async function updateReport(req, res) {
               await new sql.Request(tx)
                 .input("id", sql.Int, sampleIndicatorId)
                 .query(`UPDATE sample_indicators SET status = 'pending' WHERE id = @id`);
-              console.log(`Restored indicator ${indicatorId} for sample ${sampleId}`);
             }
           }
         }
@@ -682,7 +665,6 @@ export async function updateReport(req, res) {
               VALUES (@sampleId, @indicatorId, 'pending')
             `);
           sampleIndicatorId = inserted.recordset[0].id;
-          console.log(`Inserted new indicator ${indicatorId} for sample ${sampleId}`);
         }
 
         // 6) Process test result if provided
@@ -730,8 +712,33 @@ export async function updateReport(req, res) {
       }
     }
 
+    // If report was "tested", check if all results still exist
+    if (currentStatus === "tested") {
+      const missingResults = await new sql.Request(tx)
+        .input("reportId", sql.Int, reportId)
+        .query(`
+          SELECT COUNT(*) AS missing
+          FROM sample_indicators si
+          JOIN samples s ON s.id = si.sample_id
+          LEFT JOIN test_results tr ON tr.sample_indicator_id = si.id
+          WHERE s.report_id = @reportId
+            AND s.status != 'deleted'
+            AND si.status != 'deleted'
+            AND (tr.id IS NULL OR (tr.result_value IS NULL AND tr.is_detected IS NULL))
+        `);
+
+      if (missingResults.recordset[0].missing > 0) {
+        await new sql.Request(tx)
+          .input("reportId", sql.Int, reportId)
+          .query(`
+            UPDATE reports
+            SET status = 'incomplete', updated_at = GETDATE()
+            WHERE id = @reportId
+          `);
+      }
+    }
+
     await tx.commit();
-    console.log("=== UPDATE COMPLETE ===");
     return res.json({ message: "Report updated successfully" });
   } catch (err) {
     console.error("Update error:", err);

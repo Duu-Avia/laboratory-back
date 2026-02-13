@@ -33,9 +33,17 @@ const resetTables = async () => {
         await pool.request().query(`IF OBJECT_ID('lab_types', 'U') IS NOT NULL DROP TABLE lab_types`);
         console.log("✅ lab_types table dropped");
 
-        // User tables (drop in correct order due to foreign keys)
         await pool.request().query(`IF OBJECT_ID('role_permissions', 'U') IS NOT NULL DROP TABLE role_permissions`);
         console.log("✅ role_permissions table dropped");
+        
+        await pool.request().query(`IF OBJECT_ID('activity_logs', 'U') IS NOT NULL DROP TABLE activity_logs`)
+        console.log("✅ activity_logs table dropped")
+
+        await pool.request().query(`IF OBJECT_ID('user_lab_types', 'U') IS NOT NULL DROP TABLE user_lab_types`)
+        console.log("✅ user_lab_types table dropped")
+
+        await pool.request().query(`IF OBJECT_ID('notifications', 'U') IS NOT NULL DROP TABLE notifications`)
+        console.log("✅ notification table dropped ")
 
         await pool.request().query(`IF OBJECT_ID('users', 'U') IS NOT NULL DROP TABLE users`);
         console.log("✅ users table dropped");

@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { getConnection } from "../config/connection-db.js";
+import { getConnection } from "../../config/connection-db.js";
 import sql from "mssql";
 
 /* ── helpers ────────────────────────────────────────────── */

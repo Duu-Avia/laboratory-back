@@ -85,6 +85,15 @@ export async function login(req, res) {
       { expiresIn: JWT_EXPIRES_IN }
     );
 
+    // Log login activity
+    pool.request()
+      .input("userId", sql.Int, user.id)
+      .query(`
+        INSERT INTO activity_logs (user_id, action, target_type, method, path, status_code)
+        VALUES (@userId, 'login', 'auth', 'POST', '/auth/login', 200)
+      `)
+      .catch(() => {});
+
     res.json({
       message: "Амжилттай нэвтэрлээ",
       token,

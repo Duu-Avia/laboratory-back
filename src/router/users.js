@@ -7,6 +7,7 @@ import {
   resetUserPassword, deactivateUser, changeUserRole
 } from "../controller/users/users.js";
 import { getAllRoles } from "../controller/users/get-roles.js";
+import { getActivityLogs } from "../controller/active-logs/activity-logs.js";
 
 const usersRouter = Router();
 
@@ -14,6 +15,10 @@ const usersRouter = Router();
 usersRouter.get("/profile", getProfile);
 usersRouter.put("/profile", updateProfile);
 usersRouter.put("/profile/password", changeOwnPassword);
+
+ 
+// === activity log awah api ===
+usersRouter.get("/logs", checkPermission("system:config"), getActivityLogs)
 
 // === Existing: seniors list ===
 usersRouter.get("/seniors", getSeniorsByLabType);

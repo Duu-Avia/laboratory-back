@@ -21,6 +21,7 @@ import labTypeRouter from './router/lab-types.js';
 import notificationsRouter, { sseStreamHandler } from './router/notifications.js';
 import { startHeartbeat } from './controller/notifications/sse-manager.js';
 import { cleanOldNotifications } from './controller/notifications/notification-service.js';
+import { activityLogger } from './middleware/activity-logger.js';
 
 // Initialize Express app
 const app = express();
@@ -86,25 +87,25 @@ app.get('/', (req, res) => {
       samples: '/sample',
       labTypes: '/lab-types',
       indicators: '/indicators',
-      locations: '/locations',
+        locations: '/locations',
     },
   });
 });
 
 //Auth routes
-app.use('/auth',routerExample);
+app.use('/auth', routerExample);
 
 // SSE stream endpoint (needs query param auth since EventSource can't send headers)
 app.get('/notifications/stream', sseStreamHandler);
 
 // Mount routers
 app.use('/notifications', authMiddleware, notificationsRouter);
-app.use('/reports', authMiddleware, reportsRouter);
-app.use('/lab-types',authMiddleware, labTypeRouter);
-app.use('/indicators',authMiddleware, indicatorsRouter);
-app.use('/locations',authMiddleware, locationRouters);
-app.use('/results',authMiddleware, resultsRouter);
-app.use('/users', authMiddleware, usersRouter);
+app.use('/reports', authMiddleware,activityLogger, reportsRouter);
+app.use('/lab-types',authMiddleware,activityLogger, labTypeRouter);
+app.use('/indicators',authMiddleware,activityLogger, indicatorsRouter);
+app.use('/locations',authMiddleware,activityLogger, locationRouters);
+app.use('/results',authMiddleware,activityLogger, resultsRouter);
+app.use('/users', authMiddleware,activityLogger, usersRouter);
 
 
 

@@ -3,7 +3,7 @@ import path from "path";
 import sql from "mssql";
 import { PDFDocument, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { getConnection } from "../config/connection-db.js";
+import { getConnection } from "../../config/connection-db.js";
 
 /** -------------------- small utils -------------------- **/
 const chunk = (arr, size) => {
