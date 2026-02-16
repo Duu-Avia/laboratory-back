@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { getConnection } from "../config/connection-db.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
-const JWT_EXPIRES_IN = "8h";
+const JWT_EXPIRES_IN = "10m";
 
 // POST /auth/login
 export async function login(req, res) {

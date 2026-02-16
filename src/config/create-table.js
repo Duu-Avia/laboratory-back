@@ -7,7 +7,62 @@ async function initDatabase() {
   try {
     const pool = await getConnection();
 
-    // 1. Lab Types
+    // 1. Roles
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='roles' AND xtype='U')
+      CREATE TABLE roles (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        role_name VARCHAR(50) NOT NULL UNIQUE,
+        description NVARCHAR(200),
+        created_at DATETIME DEFAULT GETDATE()
+      )
+    `);
+    console.log("✅ roles table created");
+
+    // 2. Permissions
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='permissions' AND xtype='U')
+      CREATE TABLE permissions (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        permission_key VARCHAR(100) NOT NULL UNIQUE,
+        permission_name NVARCHAR(100),
+        module VARCHAR(50),
+        created_at DATETIME DEFAULT GETDATE()
+      )
+    `);
+    console.log("✅ permissions table created");
+
+    // 3. Role-Permission mapping
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='role_permissions' AND xtype='U')
+      CREATE TABLE role_permissions (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        role_id INT NOT NULL FOREIGN KEY REFERENCES roles(id),
+        permission_id INT NOT NULL FOREIGN KEY REFERENCES permissions(id),
+        UNIQUE(role_id, permission_id)
+      )
+    `);
+    console.log("✅ role_permissions table created");
+
+    // 4. Users
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+      CREATE TABLE users (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        email VARCHAR(100) NOT NULL UNIQUE,
+        password_hash VARCHAR(255),
+        position_name NVARCHAR(100),
+        full_name NVARCHAR(100),
+        role_id INT FOREIGN KEY REFERENCES roles(id),
+        is_active BIT DEFAULT 1,
+        last_login DATETIME2 NULL,
+        created_at DATETIME DEFAULT GETDATE(),
+        updated_at DATETIME DEFAULT GETDATE()
+      )
+    `);
+    console.log("✅ users table created");
+
+    // 5. Lab Types
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='lab_types' AND xtype='U')
       CREATE TABLE lab_types (
@@ -20,7 +75,21 @@ async function initDatabase() {
       )
     `);
     console.log("✅ lab_types table created");
-    // 2. Indicators
+
+    // 6. User-Lab Type mapping
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='user_lab_types' AND xtype='U')
+      CREATE TABLE user_lab_types (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
+        lab_type_id INT NOT NULL FOREIGN KEY REFERENCES lab_types(id),
+        created_at DATETIME DEFAULT GETDATE(),
+        UNIQUE(user_id, lab_type_id)
+      )
+    `);
+    console.log("✅ user_lab_types table created");
+
+    // 7. Indicators
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='indicators' AND xtype='U')
       CREATE TABLE indicators (
@@ -38,7 +107,7 @@ async function initDatabase() {
     `);
     console.log("✅ indicators table created");
 
-    // 3. Reports
+    // 8. Reports
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='reports' AND xtype='U')
       CREATE TABLE reports (
@@ -46,8 +115,8 @@ async function initDatabase() {
         test_start_date DATE,
         test_end_date DATE,
         status VARCHAR(50) DEFAULT 'draft',
-        assigned_to INT NULL,
-        created_by INT NULL,
+        assigned_to INT NULL FOREIGN KEY REFERENCES users(id),
+        created_by INT NULL FOREIGN KEY REFERENCES users(id),
         approved_by NVARCHAR(100),
         approved_at DATETIME NULL,
         signed_by NVARCHAR(100),
@@ -58,7 +127,7 @@ async function initDatabase() {
     `);
     console.log("✅ reports table created");
 
-    // 4. Samples 
+    // 9. Samples
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='samples' AND xtype='U')
       CREATE TABLE samples (
@@ -77,7 +146,7 @@ async function initDatabase() {
     `);
     console.log("✅ samples table created");
 
-    // 5. Sample Indicators
+    // 10. Sample Indicators
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sample_indicators' AND xtype='U')
       CREATE TABLE sample_indicators (
@@ -91,7 +160,7 @@ async function initDatabase() {
     `);
     console.log("✅ sample_indicators table created");
 
-    // 6. Test Results
+    // 11. Test Results
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='test_results' AND xtype='U')
       CREATE TABLE test_results (
@@ -108,106 +177,34 @@ async function initDatabase() {
       )
     `);
     console.log("✅ test_results table created");
-   // 7. Location  
+
+    // 12. Location Packages
     await pool.request().query(`
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='location_packages' AND xtype = 'U')
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='location_packages' AND xtype='U')
       CREATE TABLE location_packages (
-      id INT IDENTITY(1,1) PRIMARY KEY,
-      package_name NVARCHAR(200) NOT NULL,
-      lab_type_id INT FOREIGN KEY REFERENCES lab_types(id),
-      is_active BIT DEFAULT 1,
-      created_at DATETIME DEFAULT GETDATE()
-      )
-      `);
-    console.log("✅ location_packages table created")
-      // 8. Location Samples
-    await pool.request().query(`
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name = 'location_samples' AND xtype= 'U')
-      CREATE TABLE location_samples(
-      id INT IDENTITY(1,1) PRIMARY KEY,
-      location_name NVARCHAR(200) NOT NULL,
-      sort_order INT DEFAULT 0,
-      location_package_id INT FOREIGN KEY REFERENCES location_packages(id),
-      is_active BIT DEFAULT 1
-      )
-      `)
-    console.log("✅ location_names table created")
-
-        // 1 Roles table
-    await pool.request().query(`
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='roles' AND xtype='U')
-      CREATE TABLE roles (
-      id INT IDENTITY(1,1) PRIMARY KEY,
-      role_name VARCHAR(50) NOT NULL UNIQUE,
-      description NVARCHAR(200),
-      created_at DATETIME DEFAULT GETDATE()
-    )
-      `) 
-
-    // Permissions table
-    await pool.request().query(`
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='permissions' AND xtype='U')
-      CREATE TABLE permissions (
-      id INT IDENTITY(1,1) PRIMARY KEY,
-      permission_key VARCHAR(100) NOT NULL UNIQUE,  -- 'report:create'
-      permission_name NVARCHAR(100),                -- 'Тайлан үүсгэх'
-      module VARCHAR(50),                           -- 'report', 'user', 'sample'
-      created_at DATETIME DEFAULT GETDATE()
-    )
-      `) 
-
-    // Role-Permission mapping
-    await pool.request().query(`
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='role_permissions' AND xtype='U')
-       CREATE TABLE role_permissions (
-      id INT IDENTITY(1,1) PRIMARY KEY,
-      role_id INT NOT NULL FOREIGN KEY REFERENCES roles(id),
-      permission_id INT NOT NULL FOREIGN KEY REFERENCES permissions(id),
-      UNIQUE(role_id, permission_id)
-    )`);
-
-    // Users table
- await pool.request().query(`
-    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
-    CREATE TABLE users (
-    id INT IDENTITY(1,1) PRIMARY KEY,             -- ← Нэмэх (Дараа Keycloak-д) keycloak_id VARCHAR(100) UNIQUE, 
-    email VARCHAR(100) NOT NULL UNIQUE,
-    password_hash VARCHAR(255),
-    position_name NVARCHAR(100),
-    full_name NVARCHAR(100),
-    role_id INT FOREIGN KEY REFERENCES roles(id),
-    is_active BIT DEFAULT 1,
-    last_login DATETIME2 NULL,
-    created_at DATETIME DEFAULT GETDATE(),
-    updated_at DATETIME DEFAULT GETDATE()
-  )
-`);
-    // User-Lab Type mapping (which user belongs to which lab type)
-    await pool.request().query(`
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='user_lab_types' AND xtype='U')
-      CREATE TABLE user_lab_types (
         id INT IDENTITY(1,1) PRIMARY KEY,
-        user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
-        lab_type_id INT NOT NULL FOREIGN KEY REFERENCES lab_types(id),
-        created_at DATETIME DEFAULT GETDATE(),
-        UNIQUE(user_id, lab_type_id)
+        package_name NVARCHAR(200) NOT NULL,
+        lab_type_id INT FOREIGN KEY REFERENCES lab_types(id),
+        is_active BIT DEFAULT 1,
+        created_at DATETIME DEFAULT GETDATE()
       )
     `);
-    console.log("✅ user_lab_types table created");
+    console.log("✅ location_packages table created");
 
-    // Add assigned_to column if not exists (for existing databases)
+    // 13. Location Samples
     await pool.request().query(`
-      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('reports') AND name = 'assigned_to')
-        ALTER TABLE reports ADD assigned_to INT NULL;
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='location_samples' AND xtype='U')
+      CREATE TABLE location_samples (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        location_name NVARCHAR(200) NOT NULL,
+        sort_order INT DEFAULT 0,
+        location_package_id INT FOREIGN KEY REFERENCES location_packages(id),
+        is_active BIT DEFAULT 1
+      )
     `);
+    console.log("✅ location_samples table created");
 
-    // Add created_by column if not exists (report ownership)
-    await pool.request().query(`
-      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('reports') AND name = 'created_by')
-        ALTER TABLE reports ADD created_by INT NULL;
-    `);
-
-    // Report Comments (rejection feedback, resubmission notes)
+    // 14. Report Comments
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='report_comments' AND xtype='U')
       CREATE TABLE report_comments (
@@ -221,7 +218,7 @@ async function initDatabase() {
     `);
     console.log("✅ report_comments table created");
 
-    // Notifications table
+    // 15. Notifications
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='notifications' AND xtype='U')
       CREATE TABLE notifications (
@@ -235,33 +232,34 @@ async function initDatabase() {
         created_at DATETIME DEFAULT GETDATE()
       )
     `);
+    console.log("✅ notifications table created");
 
-    // Index for fast recipient queries
+    // 16. Activity Logs
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='activity_logs' AND xtype='U')
+      CREATE TABLE activity_logs (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
+        action VARCHAR(50),
+        target_type VARCHAR(50),
+        target_id INT NULL,
+        method VARCHAR(50),
+        path VARCHAR(50),
+        status_code INT,
+        created_at DATETIME DEFAULT GETDATE()
+      )
+    `);
+    console.log("✅ activity_logs table created");
+
+    // Index for fast notification queries
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_notifications_recipient_read')
         CREATE INDEX IX_notifications_recipient_read
         ON notifications (recipient_id, is_read, created_at DESC)
     `);
-    console.log("✅ notifications table created");
+    console.log("✅ indexes created");
 
-
-    // logs table
-    await pool.request().query(`
-     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='activity_logs' AND xtype='U') 
-     CREATE TABLE activity_logs (
-     id INT IDENTITY(1,1) PRIMARY KEY,
-     user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
-     action VARCHAR(50),
-     target_type VARCHAR(50),
-     target_id INT NULL,
-     method VARCHAR(50),
-     path VARCHAR(50),
-     status_code INT,
-     created_at DATETIME DEFAULT GETDATE()
-     ) 
-     `)
-
-    console.log("✅  tables created");
+    console.log("✅ All tables created successfully");
   } catch (error) {
     console.log("❌ Failed while creating tables", error);
     process.exit(1);
