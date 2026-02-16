@@ -85,9 +85,9 @@ async function seedUserData() {
     // Dummy users
     await pool.request().query(`
     INSERT INTO users (email, password_hash, position_name, full_name, role_id) VALUES
-    ('superadmin@lab.com', 'temp123','Sys owner' N'Super Admin', 1),
+    ('superadmin@mmc.mn', 'temp123','Sys owner', N'Super Admin', 1),
     ('zorigtbold@mmc.mn', 'temp123', N'Manager', N'Zorigtbold', 2),
-    ('Otgontetseg@mmc.mn', 'temp123', N'Ус химич', N'Отгонцэцэг', 3)
+    ('Otgontsetseg@mmc.mn', 'temp123', N'Ус химич', N'Отгонцэцэг', 3),
     ('Tuvshinjargal@mmc.mn', 'temp123', N'Микробиологч', N'Түвшинжаргал', 3)
     `);
     console.log("✅ Dummy users inserted");

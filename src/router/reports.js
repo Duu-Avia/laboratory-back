@@ -1,5 +1,10 @@
 import { Router } from "express";
-import { archiveReport, createReportWithSamples, getReportDetail, listReports, saveReportResultsBulk, sofDeleteReport, updateReport } from "../controller/reports/reports.js";
+import { createReportWithSamples } from "../controller/reports/create-report.js";
+import { listReports } from "../controller/reports/list-reports.js";
+import { getReportDetail } from "../controller/reports/get-report-detail.js";
+import { updateReport } from "../controller/reports/update-report.js";
+import { softDeleteReport } from "../controller/reports/delete-report.js";
+import { archiveReport } from "../controller/reports/archive-report.js";
 import { approveReport } from "../controller/reports/approve-report.js";
 import { rejectReport } from "../controller/reports/reject-report.js";
 import { signReport } from "../controller/reports/sign-report.js";
@@ -10,16 +15,16 @@ import { checkPermission } from "../middleware/auth-middleware.js";
 
 const reportsRouter = Router();
 
-reportsRouter.post("/create", checkPermission("report:create"), createReportWithSamples); //true
-reportsRouter.get("/excel", generateExcel)
-reportsRouter.get("/",  checkPermission("report:read"), listReports); //true
-reportsRouter.get("/archive", checkPermission("report:read"), archiveReport)
+reportsRouter.post("/create", checkPermission("report:create"), createReportWithSamples);
+reportsRouter.get("/excel", generateExcel);
+reportsRouter.get("/", checkPermission("report:read"), listReports);
+reportsRouter.get("/archive", checkPermission("report:read"), archiveReport);
 reportsRouter.get("/next-id", checkPermission("report:read"), getNextReportId);
-reportsRouter.get("/:id",  checkPermission("report:read"), getReportDetail); //true
-reportsRouter.get("/:id/pdf", checkPermission("report:read"), getReportPdf); //true
-reportsRouter.put("/edit/:id", checkPermission("report:update"), updateReport) //true
-reportsRouter.put("/:id/delete", checkPermission("report:delete"), sofDeleteReport) //true
-reportsRouter.put("/sign/:id",  signReport)
-reportsRouter.put("/approve/:id", checkPermission("report:approve"), approveReport)
-reportsRouter.put("/reject/:id", checkPermission("report:approve"), rejectReport)
+reportsRouter.get("/:id", checkPermission("report:read"), getReportDetail);
+reportsRouter.get("/pdf/:id", checkPermission("report:read"), getReportPdf);
+reportsRouter.put("/update/:id", checkPermission("report:update"), updateReport);
+reportsRouter.put("/deactive/:id", checkPermission("report:delete"), softDeleteReport);
+reportsRouter.put("/sign/:id", signReport);
+reportsRouter.put("/approve/:id", checkPermission("report:approve"), approveReport);
+reportsRouter.put("/reject/:id", checkPermission("report:approve"), rejectReport);
 export default reportsRouter;
