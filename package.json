@@ -8,7 +8,8 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node src/index.js",
+    "start:dev": "cross-env NODE_ENV=development node --watch src/index.js",
+    "start:prod": "cross-env NODE_ENV=production node src/index.js",
     "dev": "node --watch src/index.js",
     "db:setup": "node src/config/create-table.js",
     "db:seed": "node src/config/dummy-data.js",
@@ -43,6 +44,7 @@
   "devDependencies": {
     "@types/mssql": "^9.1.8",
     "@types/node": "^25.0.3",
+    "cross-env": "^10.1.0",
     "eslint": "^9.0.0"
   }
 }
