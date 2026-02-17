@@ -4,9 +4,9 @@ import { addClient, removeClient } from "./sse-manager.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
-// SSE Stream - accepts token via ?token=xxx query parameter
+// SSE Stream - reads token from httpOnly cookie
 export function sseStreamHandler(req, res) {
-  const token = req.query.token;
+  const token = req.cookies?.token;
   if (!token) {
     return res.status(401).json({ message: "Token шаардлагатай" });
   }

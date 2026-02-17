@@ -94,22 +94,47 @@ export async function login(req, res) {
       `)
       .catch(() => {});
 
+    const cookieOptions = {
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 35 * 60 * 1000, // 35 minutes (matches JWT_EXPIRES_IN)
+      path: "/",
+    };
+
+    // httpOnly JWT — frontend can't touch it
+    res.cookie("token", token, { ...cookieOptions, httpOnly: true });
+
+    // Readable user info — frontend reads instantly
+    const userData = {
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name,
+      role: user.role_name,
+      permissions,
+      lab_types,
+    };
+    res.cookie("user_info", JSON.stringify(userData), { ...cookieOptions, httpOnly: false });
+
     res.json({
       message: "Амжилттай нэвтэрлээ",
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name,
-        role: user.role_name,
-        permissions,
-        lab_types,
-      },
+      user: userData,
     });
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ message: "Нэвтрэхэд алдаа гарлаа", error: String(err.message) });
   }
+}
+
+// POST /auth/logout
+export function logout(req, res) {
+  const cookieOptions = {
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  };
+  res.clearCookie("token", { ...cookieOptions, httpOnly: true });
+  res.clearCookie("user_info", { ...cookieOptions, httpOnly: false });
+  res.json({ message: "Амжилттай гарлаа" });
 }
 
 // GET /auth/me - Одоогийн хэрэглэгчийн мэдээлэл + permissions

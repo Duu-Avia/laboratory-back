@@ -1,7 +1,7 @@
 
 // Auth
 import Router from "express";
-import { getAllPermissions, getMe, login } from "../controller/auth-controller.js";
+import { getAllPermissions, getMe, login, logout } from "../controller/auth-controller.js";
 import { authMiddleware } from "../middleware/auth-middleware.js";
 // Reports (жишээ)
 
@@ -9,6 +9,7 @@ import { authMiddleware } from "../middleware/auth-middleware.js";
 export const routerExample = Router();
 // ============ AUTH ROUTES (Нэвтэрч орж token авнашдээ хө) ============
 routerExample.post("/login", login);
+routerExample.post("/logout", logout);
 
 // ============ PROTECTED ROUTES (нэвтэрсэн хэрэгтэй) ============
 

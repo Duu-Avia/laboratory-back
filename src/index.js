@@ -1,4 +1,5 @@
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import config from './config/index.js';
 import { getConnection } from './config/connection-db.js';
 import {
@@ -35,6 +36,9 @@ app.use(createCorsMiddleware());
 
 // Request logging
 app.use(requestLogger);
+
+// Cookie parsing
+app.use(cookieParser());
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
