@@ -31,7 +31,7 @@ const app = express();
 // Middleware Stack
 // ==============================================
 
-// CORS - must be before other middleware
+// CORS - 
 app.use(createCorsMiddleware());
 
 // Request logging
