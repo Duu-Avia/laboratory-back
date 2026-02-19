@@ -1,6 +1,5 @@
 /**
  * Middleware Index
- *
  * Centralized export for all middleware modules.
  */
 
