@@ -43,7 +43,7 @@ const ROUTE_MAP = [
   // { method: "GET", pattern: /^\/locations/, action: "view", target_type: "location" },
 ];
 
-// Skip these paths
+// ene heden pathiig alhasah variable
 const SKIP_PATHS = ["/health", "/ready", "/", "/notifications", "/activity-logs"];
 
 function matchRoute(method, path) {
