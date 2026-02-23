@@ -15,6 +15,7 @@ COPY --from=deps /app/node_modules ./node_modules
 
 COPY src ./src
 COPY migrations ./migrations
+COPY .env.production .env.production
 
 EXPOSE 8000
 
