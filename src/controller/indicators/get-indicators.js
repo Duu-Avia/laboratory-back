@@ -17,6 +17,7 @@ export async function getAllIndicators(req, res){
         i.updated_at,
         i.lab_type_id
         FROM indicators i
+        WHERE i.is_active = 1
         `)
         const rows = response.recordset;
        
