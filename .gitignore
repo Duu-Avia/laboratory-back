@@ -138,3 +138,5 @@ secrets/
 *.zip
 *.tar.gz
 *.rar
+
+pnpm-lock.yaml

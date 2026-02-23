@@ -28,6 +28,22 @@ import { activityLogger } from './middleware/activity-logger.js';
 const app = express();
 
 // ==============================================
+// API Prefix
+// ==============================================
+const normalizeApiPrefix = (value) => {
+  if (!value || value === '/') return '';
+  const trimmed = value.startsWith('/') ? value : `/${value}`;
+  return trimmed.replace(/\/+$/, '');
+};
+
+const apiPrefix = normalizeApiPrefix(config.api?.prefix ?? '');
+const withApiPrefix = (path) => {
+  if (!apiPrefix) return path;
+  if (path === '/') return apiPrefix;
+  return `${apiPrefix}${path}`;
+};
+
+// ==============================================
 // Middleware Stack
 // ==============================================
 
@@ -48,7 +64,7 @@ app.use(express.urlencoded({ extended: true }));
 // Health Check Endpoints
 // ==============================================
 
-app.get('/health', (req, res) => {
+app.get(withApiPrefix('/health'), (req, res) => {
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -56,7 +72,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/ready', async (req, res) => {
+app.get(withApiPrefix('/ready'), async (req, res) => {
   try {
     await getConnection();
     res.status(200).json({
@@ -78,38 +94,38 @@ app.get('/ready', async (req, res) => {
 // ==============================================
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get(withApiPrefix('/'), (req, res) => {
   res.json({
     name: 'Laboratory API',
     version: '1.0.0',
     status: 'running',
     environment: config.env,
     endpoints: {
-      health: '/health',
-      ready: '/ready',
-      reports: '/reports',
-      samples: '/sample',
-      labTypes: '/lab-types',
-      indicators: '/indicators',
-        locations: '/locations',
+      health: withApiPrefix('/health'),
+      ready: withApiPrefix('/ready'),
+      reports: withApiPrefix('/reports'),
+      samples: withApiPrefix('/sample'),
+      labTypes: withApiPrefix('/lab-types'),
+      indicators: withApiPrefix('/indicators'),
+      locations: withApiPrefix('/locations'),
     },
   });
 });
 
 //Auth routes
-app.use('/auth', routerExample);
+app.use(withApiPrefix('/auth'), routerExample);
 
 // SSE stream endpoint (needs query param auth since EventSource can't send headers)
-app.get('/notifications/stream', sseStreamHandler);
+app.get(withApiPrefix('/notifications/stream'), sseStreamHandler);
 
 // Mount routers
-app.use('/notifications', authMiddleware, notificationsRouter);
-app.use('/reports', authMiddleware,activityLogger, reportsRouter);
-app.use('/lab-types',authMiddleware,activityLogger, labTypeRouter);
-app.use('/indicators',authMiddleware,activityLogger, indicatorsRouter);
-app.use('/locations',authMiddleware,activityLogger, locationRouters);
-app.use('/results',authMiddleware,activityLogger, resultsRouter);
-app.use('/users', authMiddleware,activityLogger, usersRouter);
+app.use(withApiPrefix('/notifications'), authMiddleware, notificationsRouter);
+app.use(withApiPrefix('/reports'), authMiddleware,activityLogger, reportsRouter);
+app.use(withApiPrefix('/lab-types'),authMiddleware,activityLogger, labTypeRouter);
+app.use(withApiPrefix('/indicators'),authMiddleware,activityLogger, indicatorsRouter);
+app.use(withApiPrefix('/locations'),authMiddleware,activityLogger, locationRouters);
+app.use(withApiPrefix('/results'),authMiddleware,activityLogger, resultsRouter);
+app.use(withApiPrefix('/users'), authMiddleware,activityLogger, usersRouter);
 
 
 
@@ -157,14 +173,14 @@ async function startServer() {
       // Log available routes in development
       if (config.isDevelopment) {
         logger.debug('Available endpoints:', {
-          'GET /': 'API info',
-          'GET /health': 'Health check',
-          'GET /ready': 'Readiness check',
-          '/reports': 'Report management',
-          '/sample': 'Sample operations',
-          '/sample-types': 'Sample type listing',
-          '/indicators': 'Indicator management',
-          '/locations': 'Location management',
+          [`GET ${withApiPrefix('/')}`]: 'API info',
+          [`GET ${withApiPrefix('/health')}`]: 'Health check',
+          [`GET ${withApiPrefix('/ready')}`]: 'Readiness check',
+          [withApiPrefix('/reports')]: 'Report management',
+          [withApiPrefix('/sample')]: 'Sample operations',
+          [withApiPrefix('/sample-types')]: 'Sample type listing',
+          [withApiPrefix('/indicators')]: 'Indicator management',
+          [withApiPrefix('/locations')]: 'Location management',
         });
       }
     });

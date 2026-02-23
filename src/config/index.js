@@ -128,7 +128,7 @@ const config = {
   // API
   api: {
     version: process.env.API_VERSION || 'v1',
-    prefix: process.env.API_PREFIX || '/api',
+    prefix: process.env.API_PREFIX || '',
   },
 
   // Rate Limiting

@@ -9,12 +9,14 @@ RUN npm ci --omit=dev
 FROM node:20-alpine AS runner
 
 WORKDIR /app
+
+COPY .env.production ./.env.production
+
 ENV NODE_ENV=production
 
 COPY --from=deps /app/node_modules ./node_modules
 
 COPY src ./src
-COPY migrations ./migrations
 
 EXPOSE 8000
 
