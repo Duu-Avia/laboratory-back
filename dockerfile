@@ -14,7 +14,7 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 
 COPY src ./src
-COPY assets ./assets
+COPY migrations ./migrations
 
 EXPOSE 8000
 
