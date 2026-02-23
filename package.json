@@ -12,6 +12,7 @@
     "start:prod": "cross-env NODE_ENV=production node src/index.js",
     "dev": "node --watch src/index.js",
     "db:migrate": "node src/config/migrate.js",
+    "db:migrate:prod": "cross-env NODE_ENV=production node src/config/migrate.js",
     "db:setup": "node src/config/create-table.js",
     "db:seed": "node src/config/dummy-data.js",
     "db:user-seed": "node src/config/user-dummy-data.js",
