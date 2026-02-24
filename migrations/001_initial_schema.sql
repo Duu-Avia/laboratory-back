@@ -1,0 +1,203 @@
+-- Migration: 001_initial_schema.sql
+
+-- 1. Roles
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='roles' AND xtype='U')
+CREATE TABLE roles (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  role_name VARCHAR(50) NOT NULL UNIQUE,
+  description NVARCHAR(200),
+  created_at DATETIME DEFAULT GETDATE()
+);
+
+-- 2. Permissions
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='permissions' AND xtype='U')
+CREATE TABLE permissions (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  permission_key VARCHAR(100) NOT NULL UNIQUE,
+  permission_name NVARCHAR(100),
+  module VARCHAR(50),
+  created_at DATETIME DEFAULT GETDATE()
+);
+
+-- 3. Role-Permission mapping
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='role_permissions' AND xtype='U')
+CREATE TABLE role_permissions (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  role_id INT NOT NULL FOREIGN KEY REFERENCES roles(id),
+  permission_id INT NOT NULL FOREIGN KEY REFERENCES permissions(id),
+  UNIQUE(role_id, permission_id)
+);
+
+-- 4. Users
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+CREATE TABLE users (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  email VARCHAR(100) NOT NULL UNIQUE,
+  password_hash VARCHAR(255),
+  position_name NVARCHAR(100),
+  full_name NVARCHAR(100),
+  role_id INT FOREIGN KEY REFERENCES roles(id),
+  is_active BIT DEFAULT 1,
+  last_login DATETIME2 NULL,
+  created_at DATETIME DEFAULT GETDATE(),
+  updated_at DATETIME DEFAULT GETDATE()
+);
+
+-- 5. Lab Types
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='lab_types' AND xtype='U')
+CREATE TABLE lab_types (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  type_name NVARCHAR(100) NOT NULL,
+  standard NVARCHAR(100),
+  is_active BIT DEFAULT 1,
+  created_at DATETIME DEFAULT GETDATE(),
+  updated_at DATETIME DEFAULT GETDATE()
+);
+
+-- 6. User-Lab Type mapping
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='user_lab_types' AND xtype='U')
+CREATE TABLE user_lab_types (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
+  lab_type_id INT NOT NULL FOREIGN KEY REFERENCES lab_types(id),
+  created_at DATETIME DEFAULT GETDATE(),
+  UNIQUE(user_id, lab_type_id)
+);
+
+-- 7. Indicators
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='indicators' AND xtype='U')
+CREATE TABLE indicators (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  lab_type_id INT FOREIGN KEY REFERENCES lab_types(id),
+  indicator_name NVARCHAR(200) NOT NULL,
+  unit NVARCHAR(50),
+  test_method NVARCHAR(100),
+  limit_value NVARCHAR(100),
+  is_default BIT DEFAULT 0,
+  input_type VARCHAR(20) DEFAULT 'detected',
+  is_active BIT DEFAULT 1,
+  created_at DATETIME DEFAULT GETDATE(),
+  updated_at DATETIME DEFAULT GETDATE()
+);
+
+-- 8. Reports
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='reports' AND xtype='U')
+CREATE TABLE reports (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  test_start_date DATE,
+  test_end_date DATE,
+  status VARCHAR(50) DEFAULT 'draft',
+  assigned_to INT NULL FOREIGN KEY REFERENCES users(id),
+  created_by INT NULL FOREIGN KEY REFERENCES users(id),
+  approved_by NVARCHAR(100),
+  approved_at DATETIME NULL,
+  signed_by NVARCHAR(100),
+  signed_at DATETIME NULL,
+  created_at DATETIME DEFAULT GETDATE(),
+  updated_at DATETIME DEFAULT GETDATE()
+);
+
+-- 9. Samples
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='samples' AND xtype='U')
+CREATE TABLE samples (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  lab_type_id INT FOREIGN KEY REFERENCES lab_types(id),
+  report_id INT FOREIGN KEY REFERENCES reports(id),
+  sample_name NVARCHAR(300) NOT NULL,
+  sample_amount NVARCHAR(50),
+  location NVARCHAR(200),
+  sample_date DATE,
+  sampled_by NVARCHAR(100),
+  status VARCHAR(50) DEFAULT 'pending',
+  created_at DATETIME DEFAULT GETDATE(),
+  updated_at DATETIME DEFAULT GETDATE()
+);
+
+-- 10. Sample Indicators
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sample_indicators' AND xtype='U')
+CREATE TABLE sample_indicators (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  sample_id INT FOREIGN KEY REFERENCES samples(id) ON DELETE CASCADE,
+  indicator_id INT FOREIGN KEY REFERENCES indicators(id),
+  status VARCHAR(50) DEFAULT 'pending',
+  created_at DATETIME DEFAULT GETDATE(),
+  updated_at DATETIME DEFAULT GETDATE()
+);
+
+-- 11. Test Results
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='test_results' AND xtype='U')
+CREATE TABLE test_results (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  sample_indicator_id INT FOREIGN KEY REFERENCES sample_indicators(id) ON DELETE CASCADE,
+  result_value VARCHAR(100),
+  is_detected BIT,
+  is_within_limit BIT,
+  equipment_id NVARCHAR(100),
+  notes NVARCHAR(MAX),
+  measured_at DATETIME,
+  created_at DATETIME DEFAULT GETDATE(),
+  updated_at DATETIME DEFAULT GETDATE()
+);
+
+-- 12. Location Packages
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='location_packages' AND xtype='U')
+CREATE TABLE location_packages (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  package_name NVARCHAR(200) NOT NULL,
+  lab_type_id INT FOREIGN KEY REFERENCES lab_types(id),
+  is_active BIT DEFAULT 1,
+  created_at DATETIME DEFAULT GETDATE()
+);
+
+-- 13. Location Samples
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='location_samples' AND xtype='U')
+CREATE TABLE location_samples (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  location_name NVARCHAR(200) NOT NULL,
+  sort_order INT DEFAULT 0,
+  location_package_id INT FOREIGN KEY REFERENCES location_packages(id),
+  is_active BIT DEFAULT 1
+);
+
+-- 14. Report Comments
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='report_comments' AND xtype='U')
+CREATE TABLE report_comments (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  report_id INT NOT NULL FOREIGN KEY REFERENCES reports(id),
+  user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
+  comment NVARCHAR(MAX) NOT NULL,
+  action_type VARCHAR(20) NOT NULL,
+  created_at DATETIME DEFAULT GETDATE()
+);
+
+-- 15. Notifications
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='notifications' AND xtype='U')
+CREATE TABLE notifications (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  recipient_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
+  sender_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
+  type VARCHAR(50) NOT NULL,
+  message NVARCHAR(500) NOT NULL,
+  report_id INT NULL,
+  is_read BIT DEFAULT 0,
+  created_at DATETIME DEFAULT GETDATE()
+);
+
+-- 16. Activity Logs
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='activity_logs' AND xtype='U')
+CREATE TABLE activity_logs (
+  id INT IDENTITY(1,1) PRIMARY KEY,
+  user_id INT NOT NULL FOREIGN KEY REFERENCES users(id),
+  action VARCHAR(50),
+  target_type VARCHAR(50),
+  target_id INT NULL,
+  method VARCHAR(50),
+  path VARCHAR(50),
+  status_code INT,
+  created_at DATETIME DEFAULT GETDATE()
+);
+
+-- Indexes
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_notifications_recipient_read')
+  CREATE INDEX IX_notifications_recipient_read
+  ON notifications (recipient_id, is_read, created_at DESC);

@@ -57,7 +57,9 @@ async function initDatabase() {
         is_active BIT DEFAULT 1,
         last_login DATETIME2 NULL,
         created_at DATETIME DEFAULT GETDATE(),
-        updated_at DATETIME DEFAULT GETDATE()
+        updated_at DATETIME DEFAULT GETDATE(),
+        signature_image VARBINARY(MAX) NULL,
+        signature_uploaded_at DATETIME NULL
       )
     `);
     console.log("✅ users table created");

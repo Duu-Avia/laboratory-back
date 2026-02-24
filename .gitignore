@@ -59,6 +59,7 @@ lerna-debug.log*
 # IDE & Editor
 # ==============================================
 .idea/
+.claude/
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
@@ -126,6 +127,7 @@ secrets/
 # Database dumps
 *.sql
 !src/config/*.sql
+!migrations/*.sql
 
 # ==============================================
 # Misc

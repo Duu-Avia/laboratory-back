@@ -6,6 +6,8 @@ import {
   getAllUsers, getUserById, createUser, updateUser,
   resetUserPassword, deactivateUser, changeUserRole
 } from "../controller/users/users.js";
+import { uploadSignatureImage, getSignatureImage, deleteSignatureImage, getSignatureByUserId, uploadSignatureByUserId, deleteSignatureByUserId } from "../controller/users/user-signature.js";
+import { uploadSignature, handleMulterError } from "../middleware/upload-signature.js";
 import { getAllRoles } from "../controller/users/get-roles.js";
 import { getActivityLogs } from "../controller/active-logs/activity-logs.js";
 
@@ -15,8 +17,10 @@ const usersRouter = Router();
 usersRouter.get("/profile", getProfile);
 usersRouter.put("/profile", updateProfile);
 usersRouter.put("/profile/password", changeOwnPassword);
+usersRouter.post("/profile/signature", uploadSignature, handleMulterError, uploadSignatureImage);
+usersRouter.get("/profile/signature", getSignatureImage);
+usersRouter.delete("/profile/signature", deleteSignatureImage);
 
- 
 // === activity log awah api ===
 usersRouter.get("/logs", checkPermission("system:config"), getActivityLogs)
 
@@ -36,5 +40,8 @@ usersRouter.put("/password/:id", checkPermission("user:update"), resetUserPasswo
 usersRouter.put("/role/:id", checkPermission("user:assign_role"), changeUserRole);
 usersRouter.get("/lab-types/:id", getUserLabTypes);
 usersRouter.post("/lab-types/:id", checkPermission("user:update"), assignUserLabTypes);
+usersRouter.get("/signature/:id", checkPermission("user:read"), getSignatureByUserId);
+usersRouter.post("/signature/:id", checkPermission("user:update"), uploadSignature, handleMulterError, uploadSignatureByUserId);
+usersRouter.delete("/signature/:id", checkPermission("user:update"), deleteSignatureByUserId);
 
 export default usersRouter;

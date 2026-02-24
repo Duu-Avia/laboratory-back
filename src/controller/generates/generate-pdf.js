@@ -54,6 +54,8 @@ async function fetchReportRows(pool, reportId) {
         r.signed_by,
         r.signed_at,
         r.status AS report_status,
+        r.created_by,
+        r.assigned_to,
 
         s.id AS sample_id,
         s.sample_name,
@@ -154,6 +156,8 @@ function buildModel(rows, reportId) {
     approved_at: first.approved_at ? isoDate(first.approved_at) : null,
     signed_by: first.signed_by ?? null,
     signed_at: first.signed_at ? isoDate(first.signed_at) : null,
+    signed_by_user_id: first.created_by ?? null,
+    approved_by_user_id: first.assigned_to ?? null,
     report_status: first.report_status ?? "",
   };
 }
@@ -289,17 +293,75 @@ function drawIndicatorRows(page, indicatorChunk, sampleBatch, columns, model, fo
   });
 }
 
-function drawSignatures(page, model, font) {
+async function fetchSignatureImages(pool, model) {
+  const result = { signerSignature: null, approverSignature: null };
+
+  if (model.signed_by_user_id) {
+    const r = await pool
+      .request()
+      .input("signerId", sql.Int, model.signed_by_user_id)
+      .query(`SELECT signature_image FROM users WHERE id = @signerId`);
+    if (r.recordset[0]?.signature_image) {
+      result.signerSignature = r.recordset[0].signature_image;
+    }
+  }
+
+  if (model.approved_by_user_id && model.report_status === "approved") {
+    const r = await pool
+      .request()
+      .input("approverId", sql.Int, model.approved_by_user_id)
+      .query(`SELECT signature_image FROM users WHERE id = @approverId`);
+    if (r.recordset[0]?.signature_image) {
+      result.approverSignature = r.recordset[0].signature_image;
+    }
+  }
+
+  return result;
+}
+
+function drawSignatures(page, model, font, embeddedSignatures) {
   const black = rgb(0, 0, 0);
 
   // Engineer signature (who performed the tests)
   if (model.signed_by) {
     page.drawText(model.signed_by, { x: 360, y: 137, size: 9, font, color: black });
+
+    if (embeddedSignatures.signerPng) {
+      try {
+        const dims = embeddedSignatures.signerPng.scale(1);
+        const imgWidth = Math.min(dims.width, 80);
+        const imgHeight = (imgWidth / dims.width) * dims.height;
+        page.drawImage(embeddedSignatures.signerPng, {
+          x: 350,
+          y: 142,
+          width: imgWidth,
+          height: Math.min(imgHeight, 30),
+        });
+      } catch (err) {
+        console.error("Failed to draw signer signature image:", err);
+      }
+    }
   }
 
   // Senior engineer approval signature ("Баталсан" area)
   if (model.report_status === "approved" && model.approved_by) {
     page.drawText(model.approved_by, { x: 360, y: 116, size: 9, font, color: black });
+
+    if (embeddedSignatures.approverPng) {
+      try {
+        const dims = embeddedSignatures.approverPng.scale(1);
+        const imgWidth = Math.min(dims.width, 80);
+        const imgHeight = (imgWidth / dims.width) * dims.height;
+        page.drawImage(embeddedSignatures.approverPng, {
+          x: 350,
+          y: 121,
+          width: imgWidth,
+          height: Math.min(imgHeight, 30),
+        });
+      } catch (err) {
+        console.error("Failed to draw approver signature image:", err);
+      }
+    }
   }
 }
 
@@ -319,6 +381,9 @@ export async function getReportPdf(req, res) {
     const model = buildModel(rows, reportId);
     if (!model) return res.status(404).json({ message: "No data for this report" });
 
+    // fetch signature images
+    const signatures = await fetchSignatureImages(pool, model);
+
     // pdf init
     const templateBytes = fs.readFileSync(TEMPLATE_PATH);
     const templateDoc = await PDFDocument.load(templateBytes);
@@ -328,6 +393,23 @@ export async function getReportPdf(req, res) {
 
     const fontBytes = fs.readFileSync(FONT_PATH);
     const font = await outDoc.embedFont(fontBytes);
+
+    // pre-embed signature images (once, reused across all pages)
+    const embeddedSignatures = { signerPng: null, approverPng: null };
+    if (signatures.signerSignature) {
+      try {
+        embeddedSignatures.signerPng = await outDoc.embedPng(signatures.signerSignature);
+      } catch (err) {
+        console.error("Failed to embed signer PNG:", err);
+      }
+    }
+    if (signatures.approverSignature) {
+      try {
+        embeddedSignatures.approverPng = await outDoc.embedPng(signatures.approverSignature);
+      } catch (err) {
+        console.error("Failed to embed approver PNG:", err);
+      }
+    }
 
     // pagination
     const sampleBatches = chunk(model.samples, 3);
@@ -344,7 +426,7 @@ export async function getReportPdf(req, res) {
         drawSampleList(page, sampleBatch, font);
         drawSampleHeaders(page, sampleBatch, columns, font);
         drawIndicatorRows(page, indicatorChunk, sampleBatch, columns, model, font);
-        drawSignatures(page, model, font);
+        drawSignatures(page, model, font, embeddedSignatures);
       }
     }
 

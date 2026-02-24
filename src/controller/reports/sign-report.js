@@ -30,7 +30,8 @@ export async function signReport(req, res) {
     const userResult = await pool.request()
       .input("userId", sql.Int, req.user.userId)
       .query(`
-        SELECT id, full_name, password_hash
+        SELECT id, full_name, password_hash,
+               CASE WHEN signature_image IS NOT NULL THEN 1 ELSE 0 END AS has_signature
         FROM users
         WHERE id = @userId AND is_active = 1
       `);
@@ -48,6 +49,10 @@ export async function signReport(req, res) {
     }
     if (!isValid) {
       return res.status(401).json({ message: "Нууц үг буруу" });
+    }
+
+    if (!user.has_signature) {
+      return res.status(400).json({ message: "Гарын үсэг үүсээгүй байна. Хувийн тохиргоо хэсгээс гарын үсгээ үүсгэнэ үү?." });
     }
 
     // 2) Check report exists and is in 'tested' status

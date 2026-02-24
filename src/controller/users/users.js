@@ -41,7 +41,9 @@ export async function getProfile(req, res) {
       .input("userId", sql.Int, req.user.userId)
       .query(
         `SELECT u.id, u.email, u.full_name, u.role_id, u.is_active, u.created_at,
-                r.role_name, position_name
+                r.role_name, position_name,
+                CASE WHEN u.signature_image IS NOT NULL THEN 1 ELSE 0 END AS has_signature,
+                u.signature_uploaded_at
          FROM users u JOIN roles r ON r.id = u.role_id
          WHERE u.id = @userId`
       );
@@ -75,6 +77,8 @@ export async function getProfile(req, res) {
       role: user.role_name,
       is_active: user.is_active,
       created_at: user.created_at,
+      has_signature: !!user.has_signature,
+      signature_uploaded_at: user.signature_uploaded_at,
       permissions: permResult.recordset.map((p) => p.permission_key),
       lab_types: labResult.recordset,
     });
