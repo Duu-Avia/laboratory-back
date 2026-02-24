@@ -97,6 +97,7 @@ async function initDatabase() {
         lab_type_id INT FOREIGN KEY REFERENCES lab_types(id),
         indicator_name NVARCHAR(200) NOT NULL,
         unit NVARCHAR(50),
+        is_active BIT DEFAULT 1,
         test_method NVARCHAR(100),
         limit_value NVARCHAR(100),
         is_default BIT DEFAULT 0,
