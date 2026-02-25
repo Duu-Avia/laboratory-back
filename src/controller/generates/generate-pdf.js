@@ -332,8 +332,8 @@ function drawSignatures(page, model, font, embeddedSignatures) {
         const imgWidth = Math.min(dims.width, 80);
         const imgHeight = (imgWidth / dims.width) * dims.height;
         page.drawImage(embeddedSignatures.signerPng, {
-          x: 350,
-          y: 142,
+          x: 445,
+          y: 129,
           width: imgWidth,
           height: Math.min(imgHeight, 30),
         });
@@ -353,8 +353,8 @@ function drawSignatures(page, model, font, embeddedSignatures) {
         const imgWidth = Math.min(dims.width, 80);
         const imgHeight = (imgWidth / dims.width) * dims.height;
         page.drawImage(embeddedSignatures.approverPng, {
-          x: 350,
-          y: 121,
+          x: 445,
+          y: 108,
           width: imgWidth,
           height: Math.min(imgHeight, 30),
         });

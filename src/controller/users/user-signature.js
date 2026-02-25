@@ -1,6 +1,22 @@
 import sql from "mssql";
+import bcrypt from "bcryptjs";
 import sharp from "sharp";
 import { getConnection } from "../../config/connection-db.js";
+
+async function verifyPassword(pool, userId, password) {
+  const result = await pool
+    .request()
+    .input("userId", sql.Int, userId)
+    .query(`SELECT password_hash FROM users WHERE id = @userId AND is_active = 1`);
+
+  const user = result.recordset[0];
+  if (!user) return false;
+
+  if (user.password_hash.startsWith("$2")) {
+    return bcrypt.compare(password, user.password_hash);
+  }
+  return user.password_hash === password;
+}
 
 /**
  * Process uploaded signature image:
@@ -41,14 +57,23 @@ async function processSignature(buffer) {
 
 // POST /users/profile/signature
 export async function uploadSignatureImage(req, res) {
+  const { password } = req.body;
+  if (!password) {
+    return res.status(400).json({ message: "Нууц үг шаардлагатай" });
+  }
   if (!req.file) {
     return res.status(400).json({ message: "Гарын үсгийн зураг оруулна уу" });
   }
 
   try {
-    const pngBuffer = await processSignature(req.file.buffer);
-
     const pool = await getConnection();
+
+    const isValid = await verifyPassword(pool, req.user.userId, password);
+    if (!isValid) {
+      return res.status(401).json({ message: "Нууц үг буруу байна" });
+    }
+
+    const pngBuffer = await processSignature(req.file.buffer);
 
     await pool
       .request()
@@ -183,8 +208,18 @@ export async function deleteSignatureByUserId(req, res) {
 
 // DELETE /users/profile/signature
 export async function deleteSignatureImage(req, res) {
+  const { password } = req.body;
+  if (!password) {
+    return res.status(400).json({ message: "Нууц үг шаардлагатай" });
+  }
+
   try {
     const pool = await getConnection();
+
+    const isValid = await verifyPassword(pool, req.user.userId, password);
+    if (!isValid) {
+      return res.status(401).json({ message: "Нууц үг буруу байна" });
+    }
 
     await pool
       .request()
