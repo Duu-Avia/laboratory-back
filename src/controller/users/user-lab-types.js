@@ -2,12 +2,14 @@ import sql from "mssql";
 import { getConnection } from "../../config/connection-db.js";
 
 /**
- * GET /users/seniors?lab_type_id=1
+ * GET /users/seniors?lab_type_id=1&exclude_user_id=5
  * Returns senior engineers (admin role) assigned to a given lab type.
- * Used by frontend to populate "assign to" dropdown when creating reports.
+ * Used by frontend to populate "assign to" dropdown when signing reports.
+ * Optional exclude_user_id filters out the report creator (prevents self-approval).
  */
 export async function getSeniorsByLabType(req, res) {
   const labTypeId = Number(req.query.lab_type_id);
+  const excludeUserId = Number(req.query.exclude_user_id) || null;
 
   if (!labTypeId) {
     return res.status(400).json({ message: "lab_type_id query parameter is required" });
@@ -15,9 +17,15 @@ export async function getSeniorsByLabType(req, res) {
 
   try {
     const pool = await getConnection();
-    const result = await pool.request()
-      .input("labTypeId", sql.Int, labTypeId)
-      .query(`
+    const request = pool.request().input("labTypeId", sql.Int, labTypeId);
+
+    let excludeClause = "";
+    if (excludeUserId) {
+      request.input("excludeUserId", sql.Int, excludeUserId);
+      excludeClause = "AND u.id != @excludeUserId";
+    }
+
+    const result = await request.query(`
         SELECT u.id, u.full_name, u.email
         FROM users u
         JOIN roles r ON r.id = u.role_id
@@ -25,6 +33,7 @@ export async function getSeniorsByLabType(req, res) {
         WHERE r.role_name = 'admin'
           AND ult.lab_type_id = @labTypeId
           AND u.is_active = 1
+          ${excludeClause}
       `);
 
     res.json(result.recordset);
