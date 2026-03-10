@@ -160,7 +160,7 @@ export async function markAllAsRead(userId) {
 }
 
 /**
- * Delete notifications older than 1 month.
+ * Нэг сараас дээш болсон мэдээллийг устгана.
  */
 export async function cleanOldNotifications() {
   try {

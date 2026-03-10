@@ -9,7 +9,7 @@ A comprehensive backend API for managing laboratory test samples, reports, appro
 - **Digital Signatures** — Upload and attach signature images to reports
 - **PDF & Excel Generation** — Generate PDF reports and Excel exports
 - **Real-time Notifications** — Server-Sent Events (SSE) for live updates
-- **Role-Based Access Control** — Granular permissions per role (`superadmin`, `admin`, `senior_engineer`, `engineer`, `technician`)
+- **Role-Based Access Control** — Granular permissions per role (`superadmin`, `senior_engineer/admin`, `engineer`,)
 - **Activity Logging** — Full audit trail of all user actions
 - **Lab Types & Indicators** — Configure test types (Water, Air, Swab) with measurement indicators
 - **Location & Sample Tracking** — Manage sample locations and packages
