@@ -1,9 +1,8 @@
 /**
  * Validation Middleware
  *
- * Provides request validation using simple schema definitions.
- * For a production application, consider using Joi, Zod, or similar.
- */
+ * 
+ *  * Prod deeree zod edr ashiglah */
 
 import { ValidationError } from '../utils/errors.js';
 
